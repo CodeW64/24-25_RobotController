@@ -14,11 +14,11 @@ import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.ExposureControl;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.controls.GainControl;
-import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
+//import org.firstinspires.ftc.robotcore.external.tfod.Recognition;
 import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
-import org.firstinspires.ftc.vision.tfod.TfodProcessor;
+//import org.firstinspires.ftc.vision.tfod.TfodProcessor;
 
 import java.util.List;
 import java.util.concurrent.TimeUnit;
@@ -31,7 +31,7 @@ public class RobotVision {
 
     }
 
-    public enum AllianceSpecific {
+    /*public enum AllianceSpecific {
 
         RED_ALLIANCE("TeamPropRed"),
         BLUE_ALLIANCE("TeamPropBlue");
@@ -41,15 +41,15 @@ public class RobotVision {
         AllianceSpecific(String label) {
             this.label = label;
         }
-    }
+    }*/
 
 
     // TODO: change for next season to match Tensorflow model
-    private static final String TFOD_MODEL_ASSET = "CenterstageMeetTwo.tflite";
+    /*private static final String TFOD_MODEL_ASSET = "CenterstageMeetTwo.tflite";
     private static final String[] LABELS = {
             "TeamPropBlue",
             "TeamPropRed",
-    };
+    };*/
 
     private final String[] pathValues = {"Left", "Center", "Right"};
 
@@ -81,7 +81,7 @@ public class RobotVision {
     private AprilTagProcessor aprilTag;              // Used for managing the AprilTag detection process.
     private AprilTagDetection desiredTag;
 
-    private TfodProcessor tfod;
+//    private TfodProcessor tfod;
 
     private final HardwareMap hardwareMap;
     private final Telemetry telemetry;
@@ -109,7 +109,7 @@ public class RobotVision {
         this.initialized = false;
 
         if (usingAprilTag) initAprilTag();
-        if (usingTensorflow) initTensorflow();
+//        if (usingTensorflow) initTensorflow();
         initVisionPortal();
 
         leftFrontDrive = hardwareMap.get(DcMotor.class, "frontLeft");
@@ -129,7 +129,7 @@ public class RobotVision {
     /**
      * @return path value for autonomous mode.
      */
-    public int scanForTensorflowRecognitions(AllianceSpecific alliance) {
+    /*public int scanForTensorflowRecognitions(AllianceSpecific alliance) {
 
         double posX = 0;
         int path = 10;
@@ -192,7 +192,7 @@ public class RobotVision {
 
         return path;
     }
-
+*/
 
 
 
@@ -363,12 +363,12 @@ public class RobotVision {
 
     }
 
-    private void initTensorflow() {
+    /*private void initTensorflow() {
         tfod = new TfodProcessor.Builder()
                 .setModelAssetName(TFOD_MODEL_ASSET)
                 .setModelLabels(LABELS)
                 .build();
-    }
+    }*/
 
     private void initVisionPortal() {
         // Create the vision portal by using a builder.
@@ -376,7 +376,7 @@ public class RobotVision {
             VisionPortal.Builder builder = new VisionPortal.Builder();
             builder.setCamera(hardwareMap.get(WebcamName.class, "eyeball"));
 
-            if (usingTensorflow) builder.addProcessor(tfod);
+//            if (usingTensorflow) builder.addProcessor(tfod);
             if (usingAprilTag) builder.addProcessor(aprilTag);
 
             visionPortal = builder.build();
