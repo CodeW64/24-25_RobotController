@@ -48,6 +48,13 @@ public class AprilLocater extends AutoInit {
     protected VisionPortal visionPortal;   // Used to manage the video source.
     protected AprilTagProcessor aprilTag;  // Used for managing the AprilTag detection process.
     // protected AprilTagDetection desiredTag = null;
+    
+    public static COLORED_RED_ID = 11;
+    public static NEUTRAL_BLUE_ID = 13;
+    public static COLORED_BLUE_ID = 14;
+    public static NEUTRAL_RED_ID = 16;
+
+    public static SPIKE_DISTANCE = 10; // In inches 
 
     /**
      * Initialize the AprilTag processor.
