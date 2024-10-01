@@ -16,6 +16,6 @@ import com.qualcomm.robotcore.eventloop.opmode.Auto;
  * @since 9/29/2024
  */
 @Auto(name="Sample Pusher" group="Auto")
-public class SamplePusherAuto extends AutoPathFollower {
+public class SamplePusherAuto extends AutoCommonPaths {
     
 }

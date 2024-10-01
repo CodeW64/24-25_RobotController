@@ -144,9 +144,11 @@ public class AprilLocater extends AutoInit {
     }
 
     /**
-     * Returns a Pose2d object containing the x, y, and turn deltas to the camera lens.
+     * Returns a Pose2d object containing the x, y, and turn deltas to the 
+     * camera lens.
      * 
-     * @param tag AprilTagDetection - The detection as returned by {@code getDetection}
+     * @param tag AprilTagDetection - The detection as returned by {@code 
+     * getDetection}
      */
     protected static convertDetectionToPose(AprilTagDetection tag) {
         return new Pose2d(tag.ftcPose.x, tag.ftcPose.y, tag.ftcPose.yaw);
