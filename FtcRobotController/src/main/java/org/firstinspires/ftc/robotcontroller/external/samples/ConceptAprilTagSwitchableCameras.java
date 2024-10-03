@@ -174,7 +174,7 @@ public class ConceptAprilTagSwitchableCameras extends LinearOpMode {
     }   // end method telemetryAprilTag()
 
     /**
-     * Set the active camera according to input from the gamepad.
+     * Set the active camera according to input from the gamepad1.
      */
     private void doCameraSwitching() {
         if (visionPortal.getCameraState() == CameraState.STREAMING) {

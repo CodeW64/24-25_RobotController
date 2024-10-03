@@ -27,7 +27,7 @@
 * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
-package org.firstinspires.ftc.teamcode.auto;
+package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -38,6 +38,13 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
+
+import org.firstinspires.ftc.teamcode.MecanumDrive;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.ftc.Actions;
 
 /**
  * Implements methods and fields useful to the location of april tags.
@@ -49,12 +56,12 @@ public class AprilLocater extends AutoInit {
     protected AprilTagProcessor aprilTag;  // Used for managing the AprilTag detection process.
     // protected AprilTagDetection desiredTag = null;
     
-    public static COLORED_RED_ID = 11;
-    public static NEUTRAL_BLUE_ID = 13;
-    public static COLORED_BLUE_ID = 14;
-    public static NEUTRAL_RED_ID = 16;
+    public static int COLORED_RED_ID = 11;
+    public static int NEUTRAL_BLUE_ID = 13;
+    public static int COLORED_BLUE_ID = 14;
+    public static int NEUTRAL_RED_ID = 16;
 
-    public static SPIKE_DISTANCE = 10; // In inches 
+    public static int SPIKE_DISTANCE = 10; // In inches 
 
     /**
      * Initialize the AprilTag processor.
@@ -83,7 +90,9 @@ public class AprilLocater extends AutoInit {
      * Manually set the camera gain and exposure.
      * This can only be called AFTER calling initAprilTag(), and only works for Webcams;
      */
-    protected void setManualExposure(int exposureMS, int gain) {
+    protected void setManualExposure(int exposureMS, int gain) 
+        throws InterruptedException 
+    {
         // Wait for the camera to be open, then use the controls
 
         if (visionPortal == null) {
@@ -94,27 +103,24 @@ public class AprilLocater extends AutoInit {
         if (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING) {
             telemetry.addData("Camera", "Waiting");
             telemetry.update();
-            while (!isStopRequested() && (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING)) {
-                sleep(20);
+            while (visionPortal.getCameraState() != VisionPortal.CameraState.STREAMING) {
+                Thread.sleep(20);
             }
             telemetry.addData("Camera", "Ready");
             telemetry.update();
         }
 
-        // Set camera controls unless we are stopping.
-        if (!isStopRequested())
-        {
-            ExposureControl exposureControl = visionPortal.getCameraControl(ExposureControl.class);
-            if (exposureControl.getMode() != ExposureControl.Mode.Manual) {
-                exposureControl.setMode(ExposureControl.Mode.Manual);
-                sleep(50);
-            }
-            exposureControl.setExposure((long)exposureMS, TimeUnit.MILLISECONDS);
-            sleep(20);
-            GainControl gainControl = visionPortal.getCameraControl(GainControl.class);
-            gainControl.setGain(gain);
-            sleep(20);
+        // Set camera controls
+        ExposureControl exposureControl = visionPortal.getCameraControl(ExposureControl.class);
+        if (exposureControl.getMode() != ExposureControl.Mode.Manual) {
+            exposureControl.setMode(ExposureControl.Mode.Manual);
+            Thread.sleep(50);
         }
+        exposureControl.setExposure((long)exposureMS, TimeUnit.MILLISECONDS);
+        Thread.sleep(20);
+        GainControl gainControl = visionPortal.getCameraControl(GainControl.class);
+        gainControl.setGain(gain);
+        Thread.sleep(20);
     }
 
     /**
@@ -126,7 +132,7 @@ public class AprilLocater extends AutoInit {
             // Look to see if we have size info on this tag.
             if (detection.metadata != null) {
                 //  Check to see if we want to track towards this tag.
-                if ((desiredTagId < 0) || (detection.id == DESIRED_TAG_ID)) {
+                if ((desiredTagId < 0) || (detection.id == desiredTagId)) {
                     // Yes, we want to use this tag.
                     return detection;  // don't look any further.
                 } else {
@@ -150,7 +156,7 @@ public class AprilLocater extends AutoInit {
      * @param tag AprilTagDetection - The detection as returned by {@code 
      * getDetection}
      */
-    protected static convertDetectionToPose(AprilTagDetection tag) {
+    protected static Pose2d convertDetectionToPose(AprilTagDetection tag) {
         return new Pose2d(tag.ftcPose.x, tag.ftcPose.y, tag.ftcPose.yaw);
     }
 

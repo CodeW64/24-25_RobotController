@@ -13,7 +13,7 @@ import com.qualcomm.robotcore.hardware.IMU;
  * It contains several methods that allow for motion that can easily 
  * be called autonomously and allow for more precise postioning.
  */
-public class AutoCommon extends OpMode {
+public class AutoInit extends OpMode {
     /** 
      * Arbitrary value to make motors more controllable.
      */
@@ -62,9 +62,9 @@ public class AutoCommon extends OpMode {
      */
     protected double[] getDrivePowersFrom(Gamepad gamepad, double speedModifier) {
         // Uses left stick to move (in any direction), and right stick to turn.
-        final double x = speedModifier * -gamepad.left_stick_x; // Left/right
-        final double y = speedModifier * -gamepad.left_stick_y; // Forward/backward
-        final double turnPower = speedModifier * gamepad.right_stick_x;
+        final double x = speedModifier * -gamepad1.left_stick_x; // Left/right
+        final double y = speedModifier * -gamepad1.left_stick_y; // Forward/backward
+        final double turnPower = speedModifier * gamepad1.right_stick_x;
 
         // POWER_FACTOR == sqrt(0.5). sqrt(0.5) comes from trig and is used to make it move in any direction. 
         // Both plus and minus exist because of how mechanum wheels rotate to move sideways
@@ -103,9 +103,9 @@ public class AutoCommon extends OpMode {
      */
     protected double[] getDrivePowersFrom(double vx, double vy, double turn, double speedModifier) {
         // Uses left stick to move (in any direction), and right stick to turn.
-        final double x = speedModifier * -gamepad.left_stick_x; // Left/right
-        final double y = speedModifier * -gamepad.left_stick_y; // Forward/backward
-        final double turnPower = speedModifier * gamepad.right_stick_x;
+        final double x = speedModifier * -gamepad1.left_stick_x; // Left/right
+        final double y = speedModifier * -gamepad1.left_stick_y; // Forward/backward
+        final double turnPower = speedModifier * gamepad1.right_stick_x;
 
         // POWER_FACTOR == sqrt(0.5). sqrt(0.5) comes from trig and is used to make it move in any direction. 
         // Both plus and minus exist because of how mechanum wheels rotate to move sideways
@@ -239,8 +239,8 @@ public class AutoCommon extends OpMode {
      * @see getDrivePowersFrom()
      */
     protected void powerDriveMotors(double[] powers) {
-        for(short i = 0; i < motorArray.length; i++) {
-            motorArray[i].setPower(powers[i]);
+        for(short i = 0; i < driveMotorList.length; i++) {
+            driveMotorList[i].setPower(powers[i]);
         }
     }
 
@@ -251,10 +251,10 @@ public class AutoCommon extends OpMode {
      * @see getDrivePowersFrom()
      */
     protected void powerDriveMotors(double leftBack, double leftForw, double rightBack, double rightForw) {
-        driveMotors[0].setPower(leftBack);
-        driveMotors[1].setPower(leftForw);
-        driveMotors[2].setPower(rightBack);
-        driveMotors[3].setPower(rightForw);
+        driveMotorList[0].setPower(leftBack);
+        driveMotorList[1].setPower(leftForw);
+        driveMotorList[2].setPower(rightBack);
+        driveMotorList[3].setPower(rightForw);
     }
     
     /**
@@ -294,31 +294,20 @@ public class AutoCommon extends OpMode {
      */
     protected void driveWheels() {
         // Getting the values for absolute direction drive
-        final double deltaTime = getRuntime() - lastTime;
         final double up = gamepad1.dpad_up ? -1.0 : 0;
         final double down = gamepad1.dpad_down ? 1.0 : 0;
         final double left = gamepad1.dpad_left ? -1.0 : 0;
         final double right = gamepad1.dpad_right ? 1.0 : 0;
-        totalRotation -= 2 * gamepad1.right_stick_x * deltaTime / ROTATION_SPEED;
         
         // Powering the drive motors
         final int fastSpeedFactor = gamepad1.left_trigger > 0 || gamepad1.right_trigger > 0 ? 2 : 1;
         final int slowSpeedFactor = gamepad1.left_bumper || gamepad1.right_bumper ? 2 : 1;
-        if(up + down != 0 || left + right != 0) {
-            // Powering the drive motors with absolute direction
-            final double[] absolutePowers = getDrivePowersFrom(
-                getAbsoluteDirection(left + right, up + down, totalRotation),
-                MOTOR_TAMING_VALUE * fastSpeedFactor / slowSpeedFactor
-            );
-            powerDriveMotors(absolutePowers);
-        } else {
-            // Running the drive motors with relative direction
-            final double[] motorPowers = getDrivePowersFrom(
-                gamepad1, 
-                MOTOR_TAMING_VALUE * fastSpeedFactor / slowSpeedFactor
-            );
-            powerDriveMotors(motorPowers);
-        }
+        // Running the drive motors with relative direction
+        final double[] motorPowers = getDrivePowersFrom(
+            gamepad1, 
+            fastSpeedFactor / slowSpeedFactor
+        );
+        powerDriveMotors(motorPowers);
         
         // Logging important data to telemetry.
         telemetry.setCaptionValueSeparator("");
@@ -329,7 +318,6 @@ public class AutoCommon extends OpMode {
             final String[] MOTOR_NAMES = { "Left-Back", "Left-Front", "Right-Back", "Right-Front" };
             telemetry.addData(MOTOR_NAMES[i] + " Position", driveMotorList[i].getCurrentPosition());
         }
-        telemetry.addData("Absolute θ", totalRotation);
     }
     
     /**

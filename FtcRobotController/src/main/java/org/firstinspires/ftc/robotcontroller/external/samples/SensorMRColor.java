@@ -91,7 +91,7 @@ public class SensorMRColor extends LinearOpMode {
     // Note we use opModeIsActive() as our loop condition because it is an interruptible method.
     while (opModeIsActive()) {
 
-      // check the status of the x button on either gamepad.
+      // check the status of the x button on either gamepad1.
       bCurrState = gamepad1.x;
 
       // check for button state transitions.

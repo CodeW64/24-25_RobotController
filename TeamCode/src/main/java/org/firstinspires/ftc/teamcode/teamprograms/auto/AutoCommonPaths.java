@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.Range;
 import com.qualcomm.robotcore.hardware.IMU;
-import com.qualcomm.robotcore.eventloop.opmode.Auto;
+// import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
@@ -46,7 +46,7 @@ public class AutoCommonPaths extends AprilLocater {
         // Getting useful information about where the TAG is. Not necessarily where to go.
         final double drive = tag.ftcPose.range;                       // Distance from the tag
         final double strafe = Math.toRadians(tag.ftcPose.bearing);    // Angle robot is way from tag
-        final double turn = Math.toRadians(tag.ftcPose.heading + 90); // Angle of the tag
+        final double turn = Math.toRadians(tag.ftcPose.yaw + 90); // Angle of the tag
         
         final double tagCenterX = tag.ftcPose.x;
         final double tagCenterY = tag.ftcPose.y;
@@ -54,8 +54,8 @@ public class AutoCommonPaths extends AprilLocater {
         // Finding the point that the robot will drive to
         final double xBack = distBack * Math.cos(turn + Math.PI / 2);
         final double yBack = distBack * Math.sin(turn + Math.PI / 2);
-        final double xStafe = rightStrafe * Math.cos(turn + Math.PI); // Strafe to the right, x
-        final double yStafe = rightStrafe * Math.sin(turn + Math.PI); // Strafe to the right, y
+        final double xStrafe = rightStrafe * Math.cos(turn + Math.PI); // Strafe to the right, x
+        final double yStrafe = rightStrafe * Math.sin(turn + Math.PI); // Strafe to the right, y
 
         // The point is perpendicular to the April tag's turn, so go distBack at turn + 90deg away.
         // Plus and minus exist becuase two points exist so far away from the tag, but only one makes sense.
@@ -117,7 +117,7 @@ public class AutoCommonPaths extends AprilLocater {
 
         final boolean isNeutralMark = 
             tag.id == AprilLocater.NEUTRAL_RED_ID || 
-            tag.id == AprilLocater.NEUTRAL_BLUE_ID
+            tag.id == AprilLocater.NEUTRAL_BLUE_ID;
         if(!isNeutralMark) {
             // If the tag is colored, then field setup means that the tag is to the left (-)
             centerOffset *= -1;
@@ -127,18 +127,21 @@ public class AutoCommonPaths extends AprilLocater {
         final Pose2d destination = getPointAwayFromTag(tag, desiredDist, centerOffset);
         
         // DEV START: this checks to make sure that the distance is actually approx the estimated distance
-        // final double TOLERANCE = 3; // inches
-        // if(Math.pow(destination.vector.x, 2) + Math.pow(destination.vector.y, 2) - ) {
+        final double ACTUAL_DIST = 2 * TILE_SIZE - 18;
+        final double TOLERANCE = 3; // inches
+        if(Math.abs(Math.hypot(destination.position.x, destination.position.y) - ACTUAL_DIST) < TOLERANCE) {
 
-        // }
+        }
         // DEV End
         
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
-        final MecanumDrive mecDrive = new MecanumDrive(harwareMap, CAMERA_LENS_OFFSET);
+        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
         Action splineToTag = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
-            .lineToLinearHeading(destination)
+            // .lineToLinearHeading(destination)
+            .setTangent(Math.atan2(destination.position.y, destination.position.x))
+            .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
             .build();
         Actions.runBlocking(splineToTag);
         telemetry.addData("Status", "Finished action!");
@@ -153,7 +156,7 @@ public class AutoCommonPaths extends AprilLocater {
      *     For the spike mark closest to the wall, 1 for middle, 2 for the 
      *     farthest.
      */
-    public void moveRobotToSpikeMark(AprilTagDetecton tag, int tagNum) {
+    public void moveRobotToSpikeMark(AprilTagDetection tag, int tagNum) {
         // Getting the offset right from the tag to the spike marks' centers
         final double HALF_TAG_LENGTH = 1.75; // inches
         final double TILE_SIZE = 24; // In inches
@@ -161,7 +164,7 @@ public class AutoCommonPaths extends AprilLocater {
 
         final boolean isNeutralMark = 
             tag.id == AprilLocater.NEUTRAL_RED_ID || 
-            tag.id == AprilLocater.NEUTRAL_BLUE_ID
+            tag.id == AprilLocater.NEUTRAL_BLUE_ID;
         if(!isNeutralMark) {
             // If the tag is colored, then field setup means that the tag is to the left (-)
             centerOffset *= -1;
@@ -177,9 +180,11 @@ public class AutoCommonPaths extends AprilLocater {
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
-        final MecanumDrive mecDrive = new MecanumDrive(harwareMap, CAMERA_LENS_OFFSET);
+        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
         Action splineToTag = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
-            .lineToLinearHeading(destination)
+            // .lineToLinearHeading(destination)
+            .setTangent(Math.atan2(destination.position.y, destination.position.x))
+            .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
             .build();
         Actions.runBlocking(splineToTag);
         telemetry.addData("Status", "Finished action!");

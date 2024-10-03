@@ -49,7 +49,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  * There will be some variation in the values measured depending on the specific sensor you are using.
  *
  * You can increase the gain (a multiplier to make the sensor report higher values) by holding down
- * the A button on the gamepad, and decrease the gain by holding down the B button on the gamepad.
+ * the A button on the gamepad, and decrease the gain by holding down the B button on the gamepad1.
  *
  * If the color sensor has a light which is controllable from software, you can use the X button on
  * the gamepad to toggle the light on and off. The REV sensors don't support this, but instead have
