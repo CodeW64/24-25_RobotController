@@ -1,5 +1,7 @@
 package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
+import java.util.Vector;
+
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -27,13 +29,13 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
  * paths. 
  */
 public class AutoCommonPaths extends AprilLocater {
-    // private MecanumDrive mecDrive;
+    protected MecanumDrive globalDrive;
 
-    // @Override
-    // public void init() {
-    //     super.init();
-    //     mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-    // }
+    @Override
+    public void init() {
+        super.init();
+        globalDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+    }
 
     /**
      * The coordinate difference between the center of the robot and the camera
@@ -41,6 +43,12 @@ public class AutoCommonPaths extends AprilLocater {
      * camera is to the right, the y-coordinate is positive. 
      */
     private Pose2d CAMERA_LENS_OFFSET = new Pose2d(0, 0, 0);
+
+    private Pose2d getCurrentPosition() {
+        // Getting the current position of the robot
+        globalDrive.updatePoseEstimate();
+        return globalDrive.pose;
+    }
 
     public Pose2d getPointAwayFromTag(AprilTagDetection tag, double distBack, double rightStrafe) {
         // Getting useful information about where the TAG is. Not necessarily where to go.
@@ -89,7 +97,7 @@ public class AutoCommonPaths extends AprilLocater {
      *     mark. 
      * @param distFrom double - The desired distance from the chamber
      */
-    public void moveRobotToChamber(AprilTagDetection tag, double distFrom) {
+    protected void moveRobotInitalToChamber(AprilTagDetection tag, double distFrom) {
         // Finding the distance directly away from the April Tag
         /* Diagram of the distance:
          *
@@ -125,25 +133,35 @@ public class AutoCommonPaths extends AprilLocater {
 
         // Getting the and going to it in a line
         final Pose2d destination = getPointAwayFromTag(tag, desiredDist, centerOffset);
+        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
         
-        // DEV START: this checks to make sure that the distance is actually approx the estimated distance
+        // Checking that the distance to travel is approz what it should be
         final double ACTUAL_DIST = 2 * TILE_SIZE - 18;
         final double TOLERANCE = 3; // inches
-        if(Math.abs(Math.hypot(destination.position.x, destination.position.y) - ACTUAL_DIST) < TOLERANCE) {
+        final double foundDist = Math.hypot(destination.position.x, destination.position.y);
+        if(Math.abs(foundDist - ACTUAL_DIST) > TOLERANCE) {
+            telemetry.addData("!!WARNING", String.format("Distance between the April dest and hypot is %d", foundDist));
+            // The destination seems very wrong; execute fallback path (moves forward);
+            telemetry.addData("Status", "executing fallback path to chambers");
+            telemetry.update();
 
+            Action fallbackLineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
+                // .setTangent(0)
+                .lineToX(ACTUAL_DIST)
+                .build();
+            return;
         }
-        // DEV End
         
+        // Executing the action!!
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
-        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
-        Action splineToTag = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
+        Action lineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
             // .lineToLinearHeading(destination)
             .setTangent(Math.atan2(destination.position.y, destination.position.x))
             .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
             .build();
-        Actions.runBlocking(splineToTag);
+        Actions.runBlocking(lineToDestionation);
         telemetry.addData("Status", "Finished action!");
         
     }
@@ -156,12 +174,27 @@ public class AutoCommonPaths extends AprilLocater {
      *     For the spike mark closest to the wall, 1 for middle, 2 for the 
      *     farthest.
      */
-    public void moveRobotToSpikeMark(AprilTagDetection tag, int tagNum) {
+    protected void moveRobotToSpikeMark(AprilTagDetection tag, int markNum) {
         // Getting the offset right from the tag to the spike marks' centers
         final double HALF_TAG_LENGTH = 1.75; // inches
         final double TILE_SIZE = 24; // In inches
-        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches
+        final double EACH_SPIKE_DIST = 10; // In inches
+        final double ZERO_DIST = 2;        // Spike 0's distance from wall, in inches
+        final double distFrom = EACH_SPIKE_DIST * markNum + ZERO_DIST;
 
+        // Executing a fallback if the tag is null
+        if(tag == null) {
+            telemetry.addData("Status", "executing fallback path to spike mark " + markNum);
+            telemetry.update();
+
+            // Move to the spike mark using only odometry
+            final Vector2d spike0Pos = new Vector2d(TILE_SIZE, TILE_SIZE);
+            lineTo(spike0Pos.minus(new Vector2d(0, distFrom)));
+            return;
+        }
+
+        // Getting the offset from the edge to the center of the spike mark
+        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches
         final boolean isNeutralMark = 
             tag.id == AprilLocater.NEUTRAL_RED_ID || 
             tag.id == AprilLocater.NEUTRAL_BLUE_ID;
@@ -170,23 +203,87 @@ public class AutoCommonPaths extends AprilLocater {
             centerOffset *= -1;
         }
 
-        // Getting the center point of the spike mark (where the sample should be).
-        final double EACH_SPIKE_DIST = 10; // In inches
-        final double ZERO_DIST = 2;        // Spike 0's distance from wall, in inches
-        final double distFrom = EACH_SPIKE_DIST * tagNum + ZERO_DIST;
+        // Getting the center point of the spike mark (where the sample should be).;
         final Pose2d destination = getPointAwayFromTag(tag, distFrom, centerOffset);
+
 
         // Moving linearly to the spike mark's center.
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
         final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
-        Action splineToTag = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
+        Action lineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
             // .lineToLinearHeading(destination)
             .setTangent(Math.atan2(destination.position.y, destination.position.x))
             .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
             .build();
-        Actions.runBlocking(splineToTag);
+        Actions.runBlocking(lineToDestionation);
         telemetry.addData("Status", "Finished action!");
+    }
+
+    /**
+     * Moves the robot to the observation zone given the april tag
+     * 
+     * @param tag AprilTagDetection - Position data for the corresponding April Tag
+     */
+    protected void moveRobotToObservation(AprilTagDetection tag, boolean reverseAfter) {
+
+    }
+
+    /**
+     * Moves the robot to the netZone given the april tag
+     * 
+     * @param tag AprilTagDetection - Position data for the corresponding April Tag
+     */
+    protected void moveRobotToNetZone(AprilTagDetection tag) {
+        // TODO: Fill this with the needed code to run based on the tag.
+    }
+
+    /**
+     * Moves the robot to the netZone based solely on odometry
+     */
+    protected void moveRobotToNetZone() {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        final Vector2d netZonePosition = new Vector2d(0, TILE_SIZE / 2);
+        lineTo(netZonePosition);
+    }
+
+    private void lineToLinearHeading(Pose2d target) {
+        // Moving the robot forward based on the odometry
+        final Vector2d currentPos = getCurrentPosition().position;
+        final Vector2d deltaPosition = target.position.minus(currentPos);
+        Action moveToTarget = globalDrive.actionBuilder(new Pose2d(0, 0, 0))
+            .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+            .lineToXLinearHeading(target.position.x, target.heading)
+            .build();
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+    
+    private void lineTo(Vector2d target) {
+        // Moving the robot forward based on the odometry
+        final Vector2d currentPos = getCurrentPosition().position;
+        final Vector2d deltaPosition = target.minus(currentPos);
+        Action moveToTarget = globalDrive.actionBuilder(new Pose2d(0, 0, 0))
+            .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+            .lineToX(target.x)
+            .build();
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+
+    /**
+     * Moves the robot to the ascent zone given the april tag
+     * 
+     * @param tag AprilTagDetection - Position data for the corresponding April Tag
+     */
+    protected void moveRobotToAscentZone(AprilTagDetection tag) {
+        // TODO: Fill this with the needed code to run based on the tag.
+
+
+    }
+
+    protected void attemptAscent(int levelAscent) {
+        // TODO: Fill this
+
     }
 }
