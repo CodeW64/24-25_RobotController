@@ -374,7 +374,7 @@ public class RobotVision {
         // Create the vision portal by using a builder.
         if (usingAprilTag || usingTensorflow) {
             VisionPortal.Builder builder = new VisionPortal.Builder();
-            builder.setCamera(hardwareMap.get(WebcamName.class, "eyeball"));
+            builder.setCamera(hardwareMap.get(WebcamName.class, "glasses"));
 
 //            if (usingTensorflow) builder.addProcessor(tfod);
             if (usingAprilTag) builder.addProcessor(aprilTag);
