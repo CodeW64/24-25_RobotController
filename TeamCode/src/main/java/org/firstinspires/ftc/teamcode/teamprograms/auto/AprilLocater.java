@@ -56,10 +56,10 @@ public class AprilLocater extends AutoInit {
     protected AprilTagProcessor aprilTag;  // Used for managing the AprilTag detection process.
     // protected AprilTagDetection desiredTag = null;
     
-    public static int COLORED_RED_ID = 11;
-    public static int NEUTRAL_BLUE_ID = 13;
-    public static int COLORED_BLUE_ID = 14;
-    public static int NEUTRAL_RED_ID = 16;
+    public final static int COLORED_RED_ID = 11;
+    public final static int NEUTRAL_BLUE_ID = 13;
+    public final static int COLORED_BLUE_ID = 14;
+    public final static int NEUTRAL_RED_ID = 16;
 
     public static int SPIKE_DISTANCE = 10; // In inches 
 

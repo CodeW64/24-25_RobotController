@@ -31,10 +31,44 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 public class AutoCommonPaths extends AprilLocater {
     protected MecanumDrive globalDrive;
 
+    public final Vector2d FEILD_CENTER = new Vector2d(0, 0); // Origin
+
+    public final static Pose2d BLUE_SIDE_TAG = new Pose2d(-72, 0, Math.toRadians(180 - 1e-10)); 
+    public final static Pose2d BLUE_NET = new Pose2d(-60, 48, Math.toRadians(135)); 
+    public final static Pose2d BLUE_OBSERVATION = new Pose2d(-60, 48, Math.toRadians(-135)); 
+    public final static Pose2d BLUE_NEUTRAL_TAG = new Pose2d(-48, 72, Math.toRadians(90)); 
+    public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90)); 
+
+    public final static Pose2d RED_SIDE_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_SIDE_TAG); 
+    public final static Pose2d RED_NET = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NET); 
+    public final static Pose2d RED_OBSERVATION = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_OBSERVATION); 
+    public final static Pose2d RED_NEUTRAL_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NEUTRAL_TAG); 
+    public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
+
+    public static Pose2d bluePoseToRed(Pose2d bluePose2d) {
+        return new Pose2d(bluePose2d.position.times(-1), -bluePose2d.heading.toDouble());
+    }
+
+    public static Pose2d getTagPoseFromId(int id) {
+        switch(id) {
+            case AprilLocater.COLORED_BLUE_ID:
+                return AutoCommonPaths.BLUE_COLORED_TAG;
+
+            case AprilLocater.NEUTRAL_BLUE_ID:
+                return AutoCommonPaths.BLUE_NEUTRAL_TAG;
+
+            case AprilLocater.COLORED_RED_ID:
+                return AutoCommonPaths.RED_COLORED_TAG;
+
+            case AprilLocater.NEUTRAL_RED_ID:
+            default:
+                return AutoCommonPaths.RED_NEUTRAL_TAG;
+        }    
+    }
+
     @Override
     public void init() {
         super.init();
-        globalDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
     }
 
     /**
@@ -174,7 +208,7 @@ public class AutoCommonPaths extends AprilLocater {
      *     For the spike mark closest to the wall, 1 for middle, 2 for the 
      *     farthest.
      */
-    protected void moveRobotToSpikeMark(AprilTagDetection tag, int markNum) {
+    protected void moveRobotToSpikeMark(AprilTagDetection tag, int markNum, int fallBackId) {
         // Getting the offset right from the tag to the spike marks' centers
         final double HALF_TAG_LENGTH = 1.75; // inches
         final double TILE_SIZE = 24; // In inches
@@ -182,25 +216,29 @@ public class AutoCommonPaths extends AprilLocater {
         final double ZERO_DIST = 2;        // Spike 0's distance from wall, in inches
         final double distFrom = EACH_SPIKE_DIST * markNum + ZERO_DIST;
 
+        // Getting the offset from the edge to the center of the spike mark
+        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches
+        final boolean isNeutralMark = 
+            fallBackId == AprilLocater.NEUTRAL_RED_ID || 
+            fallBackId == AprilLocater.NEUTRAL_BLUE_ID;
+        if(!isNeutralMark) {
+            // If the tag is colored, then field setup means that the tag is to the left (-)
+            centerOffset *= -1;
+        }
+
         // Executing a fallback if the tag is null
         if(tag == null) {
             telemetry.addData("Status", "executing fallback path to spike mark " + markNum);
             telemetry.update();
 
             // Move to the spike mark using only odometry
-            final Vector2d spike0Pos = new Vector2d(TILE_SIZE, TILE_SIZE);
-            lineTo(spike0Pos.minus(new Vector2d(0, distFrom)));
+            final Pose2d spikeTag = getTagPoseFromId(fallBackId);
+            lineToLinearHeading(globalDrive, new Pose2d(
+                spikeTag.position.x - centerOffset, 
+                spikeTag.position.y - distFrom * Math.signum(centerOffset),
+                spikeTag.heading.toDouble()
+            ));
             return;
-        }
-
-        // Getting the offset from the edge to the center of the spike mark
-        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches
-        final boolean isNeutralMark = 
-            tag.id == AprilLocater.NEUTRAL_RED_ID || 
-            tag.id == AprilLocater.NEUTRAL_BLUE_ID;
-        if(!isNeutralMark) {
-            // If the tag is colored, then field setup means that the tag is to the left (-)
-            centerOffset *= -1;
         }
 
         // Getting the center point of the spike mark (where the sample should be).;
@@ -242,32 +280,55 @@ public class AutoCommonPaths extends AprilLocater {
     /**
      * Moves the robot to the netZone based solely on odometry
      */
-    protected void moveRobotToNetZone() {
+    protected void moveRobotToNetZone(boolean isBlue) {
         // Moving the robot forward based on the odometry
         final int TILE_SIZE = 24; // In inches
-        final Vector2d netZonePosition = new Vector2d(0, TILE_SIZE / 2);
-        lineTo(netZonePosition);
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+        lineToLinearHeading(globalDrive, pose);
     }
 
-    private void lineToLinearHeading(Pose2d target) {
+    private void lineToLinearHeading(MecanumDrive drive, Pose2d target) {
         // Moving the robot forward based on the odometry
         final Vector2d currentPos = getCurrentPosition().position;
         final Vector2d deltaPosition = target.position.minus(currentPos);
-        Action moveToTarget = globalDrive.actionBuilder(new Pose2d(0, 0, 0))
-            .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-            .lineToXLinearHeading(target.position.x, target.heading)
-            .build();
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYLinearHeading(target.position.y, target.heading)
+                .build();
+
+        } else {
+            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXLinearHeading(target.position.x, target.heading)
+                .build();
+
+        }
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
     
-    private void lineTo(Vector2d target) {
+    private void lineTo(MecanumDrive drive, Vector2d target) {
         // Moving the robot forward based on the odometry
         final Vector2d currentPos = getCurrentPosition().position;
         final Vector2d deltaPosition = target.minus(currentPos);
-        Action moveToTarget = globalDrive.actionBuilder(new Pose2d(0, 0, 0))
-            .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-            .lineToX(target.x)
-            .build();
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToY(target.y)
+                .build();
+
+        } else {
+            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToX(target.x)
+                .build();
+
+        }
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
 

@@ -270,11 +270,11 @@ public class AutoInit extends OpMode {
         // Initialize the hardware variables. Note that the strings used here as parameters
         // to 'get' must correspond to the names assigned during the robot configuration
         // step (using the FTC Robot Controller app on the phone).
-        driveMotorList[0] = hardwareMap.get(DcMotorEx.class, "left_drive_backward");
-        driveMotorList[1] = hardwareMap.get(DcMotorEx.class, "left_drive_forward");
-        driveMotorList[2] = hardwareMap.get(DcMotorEx.class, "right_drive_backward");
-        driveMotorList[3] = hardwareMap.get(DcMotorEx.class, "right_drive_forward");
-        imu = hardwareMap.get(IMU.class, "imu");
+        driveMotorList[0] = hardwareMap.get(DcMotorEx.class, "backLeft");
+        driveMotorList[1] = hardwareMap.get(DcMotorEx.class, "frontLeft");
+        driveMotorList[2] = hardwareMap.get(DcMotorEx.class, "backRight");
+        driveMotorList[3] = hardwareMap.get(DcMotorEx.class, "frontRight");
+        // imu = hardwareMap.get(IMU.class, "imu");
 
         // To drive forward, most robots need the motor on one side to be reversed, 
         // because the axles point in opposite directions.

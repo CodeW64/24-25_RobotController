@@ -42,11 +42,14 @@ public class SamplePusherAuto extends AutoCommonPaths {
     ButtonPressHandler toggleObservationPark;
     ButtonPressHandler DEV_continue;
 
+    final Pose2d START_LOCATION = new Pose2d(-63, 39, Math.toRadians(90));
     int DEV_step = 0;
 
     @Override
     public void init() {
         super.init();
+        
+        globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
 
         // Creating init_loop options
         try {
@@ -129,28 +132,34 @@ public class SamplePusherAuto extends AutoCommonPaths {
         // Driving to the net zone
         // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
         // moveRobotToNetZone(netZoneInitial); // TODO: do this based on the tag
-        moveRobotToNetZone();
+        globalDrive.updatePoseEstimate();
+        moveRobotToNetZone(isBlue);
 
         // Driving to the spike marks
-        DEV_awaitContinue();
+        // DEV_awaitContinue();
 
-        for(int i = 2; i >= 0; i++) {
+        for(int i = 2; i >= 0; i--) {
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            moveRobotToSpikeMark(spikeMark, i);
-            moveRobotToNetZone();
+            globalDrive.updatePoseEstimate();
+            moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
+            globalDrive.updatePoseEstimate();
+            moveRobotToNetZone(isBlue);
         }
 
         // Parking
-        DEV_awaitContinue();
+        // DEV_awaitContinue();
 
         telemetry.addData("Status", "Completed!");
         telemetry.update();
 
         final AprilTagDetection observationZone = getDetection(this.coloredTagId);
         if(this.shouldParkObservation) {
+            globalDrive.updatePoseEstimate();
             moveRobotToObservation(observationZone, /* ReverseAfter: */ false); 
         } else {
+            globalDrive.updatePoseEstimate();
             moveRobotToAscentZone(observationZone);
+            globalDrive.updatePoseEstimate();
             attemptAscent(1);
         }
 
