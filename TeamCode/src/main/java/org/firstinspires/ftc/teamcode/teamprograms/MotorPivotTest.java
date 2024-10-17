@@ -12,7 +12,7 @@ public class MotorPivotTest extends LinearOpMode {
     @Override
     public void runOpMode() {
 
-        twistMotor = hardwareMap.get(DcMotorEx.class, "twistMotor");
+        twistMotor = hardwareMap.get(DcMotorEx.class, "frontRight");
 
         telemetry.addLine("Press Start");
         telemetry.update();
