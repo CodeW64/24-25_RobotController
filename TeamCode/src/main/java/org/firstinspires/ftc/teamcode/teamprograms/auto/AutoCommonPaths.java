@@ -14,7 +14,9 @@ import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.Rotation2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -45,11 +47,25 @@ public class AutoCommonPaths extends AprilLocater {
     public final static Pose2d RED_NEUTRAL_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NEUTRAL_TAG); 
     public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
 
+    private Pose2d destinationOffset = new Pose2d(0, 0, 0);
+
+    /**
+     * Converts positions of blue side objects into a form usable on the red side.
+     * 
+     * @param bluePose2d A blue side object's position.
+     * @return The red-usable form of the corresponding blue object.
+     */
     public static Pose2d bluePoseToRed(Pose2d bluePose2d) {
-        // return new Pose2d(bluePose2d.position.times(-1), -bluePose2d.heading.toDouble());
+        // return multiplyPose(bluePose2d, -1);
         return bluePose2d; // DEV NOTE: This should be changed if there is a relative differnece between red and blue.
     }
 
+    /**
+     * Returns the global Pose2d of the given April tag's center.
+     * 
+     * @param id The id of the Aprial Tag desired
+     * @return The pose representing the center of the april tag.
+     */
     public static Pose2d getTagPoseFromId(int id) {
         switch(id) {
             case AprilLocater.COLORED_BLUE_ID:
@@ -73,18 +89,148 @@ public class AutoCommonPaths extends AprilLocater {
     }
 
     /**
-     * The coordinate difference between the center of the robot and the camera
-     * lense. If the camera is forward, the x-cordinate is negative. If the 
-     * camera is to the right, the y-coordinate is positive. 
+     * Adds the given pose component-wise to the next "moveTo" commands. For 
+     * example, if this was passed in Pose2d(23, -9, Math.PI / 3), and the robot
+     * is later told to move to Pose2d(10, 10, 0), the robot will end up at 
+     * Pose2d(33, 1, Math.PI / 2).  
+     * 
+     * <p> Multiple calls of this method will cumulate, adding together component 
+     * wise.
+     *  
+     * @param additiveOffset The pose that is added component-wise to any 
+     *     destination pose.
      */
-    private Pose2d CAMERA_LENS_OFFSET = new Pose2d(0, 0, 0);
+    protected void addDestinationOffset(Pose2d offset) {
+        destinationOffset = addPoses(destinationOffset, offset);
+    }
 
+    /**
+     * Adds the given pose component-wise to the next "moveTo" commands. For 
+     * example, if this was passed in Pose2d(23, -9, Math.PI / 3), and the robot
+     * is later told to move to Pose2d(10, 10, 0), the robot will end up at 
+     * Pose2d(33, 1, Math.PI / 2).  
+     * 
+     * <p> Calls of this method will override any previous offset.
+     *  
+     * @param newOffset The pose that is added component-wise to any 
+     *     destination pose.
+     */
+    protected void setDestinationOffset(Pose2d newOffset) {
+        destinationOffset = newOffset;
+    }
+
+    /**
+     * Clears all cumulative offset created by the addDestinationOffset method. 
+     * All destinations are traveled directly to.
+     */
+    protected void resetDestinationOffset() {
+        destinationOffset = new Pose2d(0, 0, 0);
+    }
+
+    /**
+     * Creates a new Pose2d as a result of adding component-wise. That is, the
+     * new Pose2d can be written as follows: new 
+     * Pose2d(x1 + x2, y1 + y2, theta1 + theta2)
+     * 
+     * @param addend1 A Pose2d to be added with another.
+     * @param addend2 A Pose2d to be added with another.
+     * @return The component-wise sum of the poses.
+     */
+    public Pose2d addPoses(Pose2d addend1, Pose2d addend2) {
+        return new Pose2d(
+            addend1.position.plus(addend2.position),
+            Rotation2d.fromDouble(addend1.heading.toDouble() + addend2.heading.toDouble())
+        );
+    }
+
+    /**
+     * Creates a new Pose2d as a result of subtracting component-wise. That is, 
+     * the new Pose2d can be written as follows: new 
+     * Pose2d(x1 - x2, y1 - y2, theta1 - theta2)
+     * 
+     * @param minuend The left-hand Pose2d, to be subtracted by another. 
+     * @param subtrahend The right-hand Pose2d, to be subtracted from another.
+     * @return The component-wise difference of the poses.
+     */
+    public Pose2d subtractPoses(Pose2d minuend, Pose2d subtrahend) {
+        return new Pose2d(
+            minuend.position.minus(subtrahend.position),
+            Rotation2d.fromDouble(minuend.heading.toDouble() - subtrahend.heading.toDouble())
+        ); 
+    }
+
+    /**
+     * Creates a new Pose2d as a result of multiplying component-wise. That is, 
+     * the new Pose2d can we written as new 
+     * Pose2d(x * scalar, y * scalar, theta * scalar,)
+     * 
+     * @param poseFactor The pose to multiply by a scalar component-wise
+     * @param scalar The number each componet of the pose is multiplied by
+     * @return The component-wise, scalar multiplication of pose.
+     */
+    public Pose2d multiplyPose(Pose2d poseFactor, double scalar) {
+        return new Pose2d(
+            poseFactor.position.x * scalar,
+            poseFactor.position.y * scalar,
+            poseFactor.heading.toDouble() * scalar
+        );
+    }
+
+    /**
+     * Creates a new Pose2d as a result of multiplying component-wise. That is, 
+     * the new Pose2d can we written as new 
+     * Pose2d(x1 * x2, y1 * y2, theta1 * theta2)
+     * 
+     * @param factor1 A pose to multiply by another, component-wise
+     * @param factor2 A pose to multiply by another, component-wise
+     * @return The component-wise product of two poses.
+     */
+    public Pose2d multiplyPoses(Pose2d factor1, Pose2d factor2) {
+        return new Pose2d(
+            factor1.position.x * factor2.position.x,
+            factor1.position.y * factor2.position.y,
+            factor1.heading.toDouble() * factor2.heading.toDouble()
+        );
+    }
+
+    /**
+     * Returns the current position of the global drive. The pose estimate is 
+     * updated as a result.
+     * 
+     * @return The pose property of the global drive after calling 
+     *     updatePoseEstimate
+     */
     protected Pose2d getCurrentPosition() {
         // Getting the current position of the robot
         globalDrive.updatePoseEstimate();
         return globalDrive.pose;
     }
 
+    /**
+     * Returns the action builder of the drive at the given position, offset by 
+     * destination offset.
+     * 
+     * @param drive The RR drivetrain to get the builder of
+     * @param position The starting position of the drive
+     * @return The drive's Actionbuilder at the given position, offset.
+     */
+    private TrajectoryActionBuilder actionBuilder(MecanumDrive drive, Pose2d position) {
+        return drive.actionBuilder(addPoses(position, destinationOffset));
+    }
+
+    /**
+     * Finds the point some distance out front of the given april tag.
+     * 
+     * @param tag The tag to park away from
+     * @param distBack How far away, in inches, to park directly away from.
+     * @param rightStrafe How far away, in inches, the robot should go right 
+     *     from the point precisely distBack from the tag.
+     * @return A pose with the properties:
+     *  <ol><li> Distance from the tag's center is hypot(distBack, rightStrafe)
+     *      <li> The rotation is perpendicular to the tag.
+     *      <li> Strafing rightStrafe distance left cancels out the original 
+     *           strafe offset.
+     */
     public Pose2d getPointAwayFromTag(AprilTagDetection tag, double distBack, double rightStrafe) {
         // Getting useful information about where the TAG is. Not necessarily where to go.
         final double drive = tag.ftcPose.range;                       // Distance from the tag
@@ -168,7 +314,7 @@ public class AutoCommonPaths extends AprilLocater {
 
         // Getting the and going to it in a line
         final Pose2d destination = getPointAwayFromTag(tag, desiredDist, centerOffset);
-        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
+        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         
         // Checking that the distance to travel is approz what it should be
         final double ACTUAL_DIST = 2 * TILE_SIZE - 18;
@@ -250,8 +396,8 @@ public class AutoCommonPaths extends AprilLocater {
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
-        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, CAMERA_LENS_OFFSET);
-        Action lineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
+        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
+        Action lineToDestionation = actionBuilder(mecDrive, new Pose2d(0, 0, 0))
             // .lineToLinearHeading(destination)
             .setTangent(Math.atan2(destination.position.y, destination.position.x))
             .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
@@ -280,6 +426,9 @@ public class AutoCommonPaths extends AprilLocater {
 
     /**
      * Moves the robot to the netZone based solely on odometry
+     * 
+     * @param isBlue Whether the robot is on the blue side. This determines 
+     *     which global coordinates to use.
      */
     protected void moveRobotToNetZone(boolean isBlue) {
         // Moving the robot forward based on the odometry
@@ -291,19 +440,35 @@ public class AutoCommonPaths extends AprilLocater {
         lineToLinearHeading(globalDrive, pose);
     }
 
-    private void lineToLinearHeading(MecanumDrive drive, Pose2d target) {
+    /**
+     * Moves the robot to the net zone based soley on odometry. This is done 
+     * relative to the start point, so no distinction is made between red or 
+     * blue.
+     */
+    protected void moveRobotToNetZone() {
+        moveRobotToNetZone(true);
+    }
+
+    /**
+     * Uses RR to move in a line to the given point. the heading changes 
+     * linearly while moving, resulting at the given target's heading. 
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     */
+    protected void lineToLinearHeading(MecanumDrive drive, Pose2d target) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
         final Vector2d deltaPosition = target.position.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = drive.actionBuilder(currentPos)
+            moveToTarget = actionBuilder(drive, currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToYLinearHeading(target.position.y, target.heading)
                 .build();
 
         } else {
-            moveToTarget = drive.actionBuilder(currentPos)
+            moveToTarget = actionBuilder(drive, currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToXLinearHeading(target.position.x, target.heading)
                 .build();
@@ -311,20 +476,27 @@ public class AutoCommonPaths extends AprilLocater {
         }
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
-    
-    private void lineTo(MecanumDrive drive, Vector2d target) {
+ 
+    /**
+     * Uses RR to move in a line to the given point. The heading remainins the 
+     * same after moving.
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     */
+    protected void lineTo(MecanumDrive drive, Vector2d target) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
         final Vector2d deltaPosition = target.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = drive.actionBuilder(currentPos)
+            moveToTarget = actionBuilder(drive, currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToY(target.y)
                 .build();
 
         } else {
-            moveToTarget = drive.actionBuilder(currentPos)
+            moveToTarget = actionBuilder(drive, currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToX(target.x)
                 .build();

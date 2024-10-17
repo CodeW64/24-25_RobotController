@@ -32,7 +32,7 @@ import com.acmerobotics.roadrunner.ftc.Actions;
  * 
  * @author Connor Larson
  */
-@Autonomous(name="Sample Pusher")
+@Autonomous(name="Simple Path Follower")
 public class SamplePusherAuto extends AutoCommonPaths {
     boolean isBlue = true;
     boolean shouldParkObservation = true; // False: Go to ascent zone there
@@ -44,7 +44,7 @@ public class SamplePusherAuto extends AutoCommonPaths {
     ButtonPressHandler toggleObservationPark;
     ButtonPressHandler repositionToggle;
 
-    final Pose2d START_LOCATION = new Pose2d(-63, 39, Math.toRadians(90));
+    final Pose2d START_LOCATION = new Pose2d(-63, 43, Math.toRadians(90));
 
     @Override
     public void init() {
@@ -109,27 +109,10 @@ public class SamplePusherAuto extends AutoCommonPaths {
         }
     }
 
-    private void logPositionWith(String title, Pose2d nextPosition) {
-        final Pose2d curPos = getCurrentPosition();
-        telemetry.addData("Positioning Title", title);
-        telemetry.addData("Current Position", String.format(
-            "(%f, %f) at angle %f",
-            curPos.position.x,
-            curPos.position.y,
-            Math.toDegrees(curPos.heading.toDouble())
-        ));
-        telemetry.addData("Target Position", String.format(
-            "(%f, %f) at angle %f", 
-            nextPosition.position.x,
-            nextPosition.position.y,
-            Math.toDegrees(nextPosition.heading.toDouble())
-        ));
-        telemetry.update();
-    }
-
     @Override
     public void start() {
         telemetry.clearAll();
+        telemetry.setAutoClear(false);
 
         // Completely disabling the idea of hitting buttons
         toggleBlueSide = null;
@@ -138,17 +121,32 @@ public class SamplePusherAuto extends AutoCommonPaths {
 
         // Driving to the net zone
         // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
-        // moveRobotToNetZone(netZoneInitial); // TODO: do this based on the tag
-        
-        logPositionWith("Going to net zone", AutoCommonPaths.BLUE_NET);
         globalDrive.updatePoseEstimate();
         moveRobotToNetZone(isBlue);
 
         // Driving to the spike marks
         for(int i = 2; i >= 0; i--) {
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
+            final Pose2d robotFrontOffset = new Pose2d(0, -10, 0);
+
+            // Moving to grab the sample
+            setDestinationOffset(robotFrontOffset); // The front goes to the destination, not the robot center
             globalDrive.updatePoseEstimate();
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
+
+            // Pushing into the pixel to grasp it
+            resetDestinationOffset();
+            final Pose2d currentPosition = getCurrentPosition();
+            lineToLinearHeading(globalDrive, new Pose2d(
+                currentPosition.position.x,
+                currentPosition.position.y + 10,
+                Math.atan2(
+                    AutoCommonPaths.BLUE_NET.position.y - (currentPosition.position.y + 10),
+                    AutoCommonPaths.BLUE_NET.position.x - currentPosition.position.x
+                )
+            ));
+            
+            // Scoring!
             globalDrive.updatePoseEstimate();
             moveRobotToNetZone(isBlue);
         }
