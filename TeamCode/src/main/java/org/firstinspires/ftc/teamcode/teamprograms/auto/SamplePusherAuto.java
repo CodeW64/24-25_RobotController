@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.Range;
 import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
 import org.firstinspires.ftc.robotcore.external.hardware.camera.WebcamName;
@@ -31,19 +32,19 @@ import com.acmerobotics.roadrunner.ftc.Actions;
  * 
  * @author Connor Larson
  */
-@Autonomous(name="Sample Pusher", group="Auto")
+@Autonomous(name="Sample Pusher")
 public class SamplePusherAuto extends AutoCommonPaths {
     boolean isBlue = true;
     boolean shouldParkObservation = true; // False: Go to ascent zone there
     int neutralTagId = AprilLocater.NEUTRAL_BLUE_ID;
     int coloredTagId = AprilLocater.COLORED_BLUE_ID;
+    boolean repositionEnabled = false;
 
     ButtonPressHandler toggleBlueSide;
     ButtonPressHandler toggleObservationPark;
-    ButtonPressHandler DEV_continue;
+    ButtonPressHandler repositionToggle;
 
     final Pose2d START_LOCATION = new Pose2d(-63, 39, Math.toRadians(90));
-    int DEV_step = 0;
 
     @Override
     public void init() {
@@ -63,8 +64,8 @@ public class SamplePusherAuto extends AutoCommonPaths {
                 shouldParkObservation = !shouldParkObservation;
             });
             
-            DEV_continue = new ButtonPressHandler(gamepad1, "start", (Gamepad g) -> {
-                DEV_step++;
+            repositionToggle = new ButtonPressHandler(gamepad1, "start", (Gamepad g) -> {
+                repositionEnabled = !repositionEnabled;
             });
         } catch(NoSuchFieldException | NullPointerException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err);
@@ -85,59 +86,65 @@ public class SamplePusherAuto extends AutoCommonPaths {
         telemetry.addLine("==== OPTION CURRENT VALUES ====");
         telemetry.addData("Is Blue Side", isBlue);
         telemetry.addData("Should Park Observation", shouldParkObservation);
-
+        telemetry.addData("Reposition Enabled", repositionEnabled);
 
         telemetry.addLine("");
         telemetry.addLine("==== OPTION CONTROLS ====");
         telemetry.addData("Toggle Blue Side", "Press " + toggleBlueSide.getButtonName());
-        telemetry.addData("Toggle Observation Park", "Press B" + toggleObservationPark.getButtonName());
+        telemetry.addData("Toggle Observation Park", "Press " + toggleObservationPark.getButtonName());
+        telemetry.addData("Respoition Toggle", "Press " + repositionToggle.getButtonName());
+        telemetry.addData("[[DEV]] Await Continue", "Press start");
 
         // Detecting buttonPresses
         try {
             toggleBlueSide.activateIfPressed();
             toggleObservationPark.activateIfPressed();
+            repositionToggle.activateIfPressed();
         } catch(NoSuchFieldException | IllegalAccessException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err);
         }
+
+        if(repositionEnabled) {
+            driveWheels();
+        }
     }
 
-    private void DEV_awaitContinue() {
-        final int startStep = DEV_step;
-
-        while(startStep == DEV_step) {
-             try {
-                DEV_continue.activateIfPressed();
-            } catch(Exception err) {
-                telemetry.addData("!!CAUGHT ERROR", err);
-                telemetry.update();
-
-                try {
-                    Thread.sleep(3000) ;
-                } catch (InterruptedException err2) {
-                    telemetry.addData("!!CAUGHT ERROR", err2);
-                    telemetry.update();
-                }
-        
-                requestOpModeStop();
-            }
-        }
+    private void logPositionWith(String title, Pose2d nextPosition) {
+        final Pose2d curPos = getCurrentPosition();
+        telemetry.addData("Positioning Title", title);
+        telemetry.addData("Current Position", String.format(
+            "(%f, %f) at angle %f",
+            curPos.position.x,
+            curPos.position.y,
+            Math.toDegrees(curPos.heading.toDouble())
+        ));
+        telemetry.addData("Target Position", String.format(
+            "(%f, %f) at angle %f", 
+            nextPosition.position.x,
+            nextPosition.position.y,
+            Math.toDegrees(nextPosition.heading.toDouble())
+        ));
+        telemetry.update();
     }
 
     @Override
     public void start() {
+        telemetry.clearAll();
+
         // Completely disabling the idea of hitting buttons
         toggleBlueSide = null;
         toggleObservationPark = null;
+        repositionToggle = null;
 
         // Driving to the net zone
         // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
         // moveRobotToNetZone(netZoneInitial); // TODO: do this based on the tag
+        
+        logPositionWith("Going to net zone", AutoCommonPaths.BLUE_NET);
         globalDrive.updatePoseEstimate();
         moveRobotToNetZone(isBlue);
 
         // Driving to the spike marks
-        // DEV_awaitContinue();
-
         for(int i = 2; i >= 0; i--) {
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
             globalDrive.updatePoseEstimate();
@@ -147,8 +154,6 @@ public class SamplePusherAuto extends AutoCommonPaths {
         }
 
         // Parking
-        // DEV_awaitContinue();
-
         telemetry.addData("Status", "Completed!");
         telemetry.update();
 
@@ -175,5 +180,10 @@ public class SamplePusherAuto extends AutoCommonPaths {
         }
 
         requestOpModeStop();
+    }
+
+    @Override
+    public void stop() {
+        powerDriveMotors(0, 0, 0, 0);
     }
 }

@@ -34,7 +34,7 @@ public class AutoCommonPaths extends AprilLocater {
     public final Vector2d FEILD_CENTER = new Vector2d(0, 0); // Origin
 
     public final static Pose2d BLUE_SIDE_TAG = new Pose2d(-72, 0, Math.toRadians(180 - 1e-10)); 
-    public final static Pose2d BLUE_NET = new Pose2d(-60, 48, Math.toRadians(135)); 
+    public final static Pose2d BLUE_NET = new Pose2d(-60, 60, Math.toRadians(135)); 
     public final static Pose2d BLUE_OBSERVATION = new Pose2d(-60, 48, Math.toRadians(-135)); 
     public final static Pose2d BLUE_NEUTRAL_TAG = new Pose2d(-48, 72, Math.toRadians(90)); 
     public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90)); 
@@ -46,7 +46,8 @@ public class AutoCommonPaths extends AprilLocater {
     public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
 
     public static Pose2d bluePoseToRed(Pose2d bluePose2d) {
-        return new Pose2d(bluePose2d.position.times(-1), -bluePose2d.heading.toDouble());
+        // return new Pose2d(bluePose2d.position.times(-1), -bluePose2d.heading.toDouble());
+        return bluePose2d; // DEV NOTE: This should be changed if there is a relative differnece between red and blue.
     }
 
     public static Pose2d getTagPoseFromId(int id) {
@@ -78,7 +79,7 @@ public class AutoCommonPaths extends AprilLocater {
      */
     private Pose2d CAMERA_LENS_OFFSET = new Pose2d(0, 0, 0);
 
-    private Pose2d getCurrentPosition() {
+    protected Pose2d getCurrentPosition() {
         // Getting the current position of the robot
         globalDrive.updatePoseEstimate();
         return globalDrive.pose;
@@ -211,13 +212,13 @@ public class AutoCommonPaths extends AprilLocater {
     protected void moveRobotToSpikeMark(AprilTagDetection tag, int markNum, int fallBackId) {
         // Getting the offset right from the tag to the spike marks' centers
         final double HALF_TAG_LENGTH = 1.75; // inches
-        final double TILE_SIZE = 24; // In inches
-        final double EACH_SPIKE_DIST = 10; // In inches
-        final double ZERO_DIST = 2;        // Spike 0's distance from wall, in inches
+        final double TILE_SIZE = 24;         // In inches
+        final double EACH_SPIKE_DIST = 10;   // In inches
+        final double ZERO_DIST = 4;          // Spike 0's distance from wall, in inches
         final double distFrom = EACH_SPIKE_DIST * markNum + ZERO_DIST;
 
         // Getting the offset from the edge to the center of the spike mark
-        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches
+        double centerOffset = TILE_SIZE - HALF_TAG_LENGTH; // inches to the right
         final boolean isNeutralMark = 
             fallBackId == AprilLocater.NEUTRAL_RED_ID || 
             fallBackId == AprilLocater.NEUTRAL_BLUE_ID;
@@ -234,7 +235,7 @@ public class AutoCommonPaths extends AprilLocater {
             // Move to the spike mark using only odometry
             final Pose2d spikeTag = getTagPoseFromId(fallBackId);
             lineToLinearHeading(globalDrive, new Pose2d(
-                spikeTag.position.x - centerOffset, 
+                spikeTag.position.x + centerOffset, 
                 spikeTag.position.y - distFrom * Math.signum(centerOffset),
                 spikeTag.heading.toDouble()
             ));
@@ -292,17 +293,17 @@ public class AutoCommonPaths extends AprilLocater {
 
     private void lineToLinearHeading(MecanumDrive drive, Pose2d target) {
         // Moving the robot forward based on the odometry
-        final Vector2d currentPos = getCurrentPosition().position;
-        final Vector2d deltaPosition = target.position.minus(currentPos);
+        final Pose2d currentPos = getCurrentPosition();
+        final Vector2d deltaPosition = target.position.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToYLinearHeading(target.position.y, target.heading)
                 .build();
 
         } else {
-            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToXLinearHeading(target.position.x, target.heading)
                 .build();
@@ -313,17 +314,17 @@ public class AutoCommonPaths extends AprilLocater {
     
     private void lineTo(MecanumDrive drive, Vector2d target) {
         // Moving the robot forward based on the odometry
-        final Vector2d currentPos = getCurrentPosition().position;
-        final Vector2d deltaPosition = target.minus(currentPos);
+        final Pose2d currentPos = getCurrentPosition();
+        final Vector2d deltaPosition = target.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToY(target.y)
                 .build();
 
         } else {
-            moveToTarget = drive.actionBuilder(new Pose2d(0, 0, 0))
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToX(target.x)
                 .build();

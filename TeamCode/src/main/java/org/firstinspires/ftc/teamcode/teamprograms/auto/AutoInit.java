@@ -274,7 +274,7 @@ public class AutoInit extends OpMode {
         driveMotorList[1] = hardwareMap.get(DcMotorEx.class, "frontLeft");
         driveMotorList[2] = hardwareMap.get(DcMotorEx.class, "backRight");
         driveMotorList[3] = hardwareMap.get(DcMotorEx.class, "frontRight");
-        // imu = hardwareMap.get(IMU.class, "imu");
+        imu = hardwareMap.get(IMU.class, "imu");
 
         // To drive forward, most robots need the motor on one side to be reversed, 
         // because the axles point in opposite directions.

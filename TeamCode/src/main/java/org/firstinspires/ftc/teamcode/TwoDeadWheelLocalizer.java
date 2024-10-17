@@ -27,10 +27,10 @@ public final class TwoDeadWheelLocalizer implements Localizer {
     public static class Params {
 
         // 30 = 2004.5
-        public double parYTicks = 2004.5; // y position of the parallel encoder (in tick units)
+        public double parYTicks = 2164.32527311559; // y position of the parallel encoder (in tick units)
 
         // 30 = 130.1
-        public double perpXTicks = 130.1; // x position of the perpendicular encoder (in tick units)
+        public double perpXTicks = -183.9643549844739; // x position of the perpendicular encoder (in tick units)
 
         // used to correct IMU inaccuracy when turning multiple times in the same direction
         // adjust as needed
@@ -60,11 +60,11 @@ public final class TwoDeadWheelLocalizer implements Localizer {
 
     public TwoDeadWheelLocalizer(HardwareMap hardwareMap, IMU imu, double inPerTick) {
 
-        par = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "backLeft")));
+        par = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "backRight")));
         perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "frontRight")));
 
-        par.setDirection(DcMotorSimple.Direction.REVERSE);
-        perp.setDirection(DcMotorSimple.Direction.REVERSE);
+        par.setDirection(DcMotorSimple.Direction.FORWARD);
+        perp.setDirection(DcMotorSimple.Direction.FORWARD);
 
         this.imu = imu;
 
