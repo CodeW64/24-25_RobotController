@@ -51,7 +51,7 @@ import com.acmerobotics.roadrunner.ftc.Actions;
  * 
  * @author Connor Larson
  */
-public class AprilLocater extends AutoInit {
+abstract public class AprilLocater extends AutoInit {
     protected VisionPortal visionPortal;   // Used to manage the video source.
     protected AprilTagProcessor aprilTag;  // Used for managing the AprilTag detection process.
     // protected AprilTagDetection desiredTag = null;
@@ -161,8 +161,8 @@ public class AprilLocater extends AutoInit {
     }
 
     @Override 
-    public void init() {
-        super.init();
+    public void opMode_init() {
+        super.opMode_init();
         initAprilTag();
     }
 }

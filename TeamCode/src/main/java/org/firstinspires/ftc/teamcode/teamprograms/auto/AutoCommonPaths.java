@@ -30,7 +30,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
  * Implements utility methods and fields useful for creating autos that follow 
  * paths. 
  */
-public class AutoCommonPaths extends AprilLocater {
+abstract public class AutoCommonPaths extends AprilLocater {
     protected MecanumDrive globalDrive;
 
     public final Vector2d FEILD_CENTER = new Vector2d(0, 0); // Origin
@@ -46,6 +46,13 @@ public class AutoCommonPaths extends AprilLocater {
     public final static Pose2d RED_OBSERVATION = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_OBSERVATION); 
     public final static Pose2d RED_NEUTRAL_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NEUTRAL_TAG); 
     public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
+
+    public enum RotationType {
+        LINEAR,
+        SPLINE
+    }
+
+    private RotationType rotationType = RotationType.LINEAR;
 
     private Pose2d destinationOffset = new Pose2d(0, 0, 0);
 
@@ -84,15 +91,15 @@ public class AutoCommonPaths extends AprilLocater {
     }
 
     @Override
-    public void init() {
-        super.init();
+    public void opMode_init() {
+        super.opMode_init();
     }
 
     /**
      * Adds the given pose component-wise to the next "moveTo" commands. For 
      * example, if this was passed in Pose2d(23, -9, Math.PI / 3), and the robot
      * is later told to move to Pose2d(10, 10, 0), the robot will end up at 
-     * Pose2d(33, 1, Math.PI / 2).  
+     * Pose2d(33, 1, Math.PI / 3).  
      * 
      * <p> Multiple calls of this method will cumulate, adding together component 
      * wise.
@@ -102,13 +109,26 @@ public class AutoCommonPaths extends AprilLocater {
      */
     protected void addDestinationOffset(Pose2d offset) {
         destinationOffset = addPoses(destinationOffset, offset);
+        telemetry.addLine("");
+        telemetry.addData("Offset", logPose(offset));
+        telemetry.addData("New Destination Offset", logPose(destinationOffset));
+        telemetry.update();
+    }
+
+    public String logPose(Pose2d p) {
+        return String.format(
+            "(%f2, %f2) at %f2",
+            p.position.x, 
+            p.position.y,
+            Math.toDegrees(p.heading.toDouble())
+        );
     }
 
     /**
      * Adds the given pose component-wise to the next "moveTo" commands. For 
      * example, if this was passed in Pose2d(23, -9, Math.PI / 3), and the robot
      * is later told to move to Pose2d(10, 10, 0), the robot will end up at 
-     * Pose2d(33, 1, Math.PI / 2).  
+     * Pose2d(33, 1, Math.PI / 3).  
      * 
      * <p> Calls of this method will override any previous offset.
      *  
@@ -117,6 +137,19 @@ public class AutoCommonPaths extends AprilLocater {
      */
     protected void setDestinationOffset(Pose2d newOffset) {
         destinationOffset = newOffset;
+        telemetry.addLine("");
+        telemetry.addData("Offset", logPose(newOffset));
+        telemetry.addData("New Destination Offset", logPose(destinationOffset));
+        telemetry.update();
+    }
+
+    /**
+     * Sets the rotationType attribute to the given value.
+     * 
+     * @param type The RotationType enum to input
+     */
+    protected void setRotationType(RotationType type) {
+        rotationType = type;
     }
 
     /**
@@ -194,6 +227,22 @@ public class AutoCommonPaths extends AprilLocater {
     }
 
     /**
+     * Transforms the given vector by a matrix. 
+     * 
+     * @param vec The vector to transform.
+     * @param matrix A length-two array of 2d vectors. The first vector is 
+     *     x-base, and the second is the y-base.
+     * @return The matrix product of a matrix with a x-basis vector and a 
+     *     y-basis vector, and the (column) vector provided
+     */
+    public Vector2d transformVector(Vector2d vec, Vector2d[] matrix) {
+        return new Vector2d(
+            vec.x * matrix[0].x + vec.y * matrix[1].y,
+            vec.x * matrix[0].y + vec.y * matrix[1].x
+        );
+    }
+
+    /**
      * Returns the current position of the global drive. The pose estimate is 
      * updated as a result.
      * 
@@ -215,7 +264,24 @@ public class AutoCommonPaths extends AprilLocater {
      * @return The drive's Actionbuilder at the given position, offset.
      */
     private TrajectoryActionBuilder actionBuilder(MecanumDrive drive, Pose2d position) {
-        return drive.actionBuilder(addPoses(position, destinationOffset));
+        // Rotating the offset. If this is not done, then the axes are messed up,
+        // and the robot will drive to the wrong spot if the heading is offset.
+        // final double headingCos = destinationOffset.heading.real;
+        // final double headingSin = destinationOffset.heading.imag;
+        // final Vector2d[] rotationMatrix = {
+        //     new Vector2d(  headingCos, headingSin ),
+        //     new Vector2d( -headingSin, headingCos )
+        // };
+        // final Vector2d rotatedVector = transformVector(destinationOffset.position, rotationMatrix);
+        // final Pose2d rotatedOffset = new Pose2d(rotatedVector, destinationOffset.heading);
+
+        // telemetry.addLine("");
+        // telemetry.addData("RotatedOffset", logPose(rotatedOffset));
+        // telemetry.update();
+
+        // // Getting you one fresh, fine offset actionbuilder!
+        // return drive.actionBuilder(addPoses(position, rotatedOffset));
+        return drive.actionBuilder(position);
     }
 
     /**
@@ -313,7 +379,8 @@ public class AutoCommonPaths extends AprilLocater {
         }
 
         // Getting the and going to it in a line
-        final Pose2d destination = getPointAwayFromTag(tag, desiredDist, centerOffset);
+        final Pose2d targetPoint = getPointAwayFromTag(tag, desiredDist, centerOffset);
+        final Pose2d destination = addPoses(targetPoint, destinationOffset);
         final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
         
         // Checking that the distance to travel is approz what it should be
@@ -380,7 +447,7 @@ public class AutoCommonPaths extends AprilLocater {
 
             // Move to the spike mark using only odometry
             final Pose2d spikeTag = getTagPoseFromId(fallBackId);
-            lineToLinearHeading(globalDrive, new Pose2d(
+            lineTo(globalDrive, new Pose2d(
                 spikeTag.position.x + centerOffset, 
                 spikeTag.position.y - distFrom * Math.signum(centerOffset),
                 spikeTag.heading.toDouble()
@@ -389,15 +456,15 @@ public class AutoCommonPaths extends AprilLocater {
         }
 
         // Getting the center point of the spike mark (where the sample should be).;
-        final Pose2d destination = getPointAwayFromTag(tag, distFrom, centerOffset);
-
+        final Pose2d targetPoint = getPointAwayFromTag(tag, distFrom, centerOffset);
+        final Pose2d destination = addPoses(targetPoint, destinationOffset);
 
         // Moving linearly to the spike mark's center.
         telemetry.addData("Status", "Executing action...");
         telemetry.update();
 
         final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        Action lineToDestionation = actionBuilder(mecDrive, new Pose2d(0, 0, 0))
+        Action lineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
             // .lineToLinearHeading(destination)
             .setTangent(Math.atan2(destination.position.y, destination.position.x))
             .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
@@ -437,7 +504,7 @@ public class AutoCommonPaths extends AprilLocater {
         if(isBlue) {
             pose = AutoCommonPaths.BLUE_NET;
         }
-        lineToLinearHeading(globalDrive, pose);
+        lineTo(globalDrive, pose);
     }
 
     /**
@@ -448,6 +515,37 @@ public class AutoCommonPaths extends AprilLocater {
     protected void moveRobotToNetZone() {
         moveRobotToNetZone(true);
     }
+    
+    /**
+     * Uses RR to move in a line to the given point. the heading changes 
+     * along a spline curve while moving, resulting at the given target's 
+     * heading. 
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     */
+    protected void lineToSplineHeading(MecanumDrive drive, Pose2d target) {
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d offsetTarget = addPoses(target, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading)
+                .build();
+
+        } else {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading)
+                .build();
+
+        }
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+ 
 
     /**
      * Uses RR to move in a line to the given point. the heading changes 
@@ -459,18 +557,19 @@ public class AutoCommonPaths extends AprilLocater {
     protected void lineToLinearHeading(MecanumDrive drive, Pose2d target) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
-        final Vector2d deltaPosition = target.position.minus(currentPos.position);
+        final Pose2d offsetTarget = addPoses(target, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = actionBuilder(drive, currentPos)
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToYLinearHeading(target.position.y, target.heading)
+                .lineToYLinearHeading(offsetTarget.position.y, offsetTarget.heading)
                 .build();
 
         } else {
-            moveToTarget = actionBuilder(drive, currentPos)
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToXLinearHeading(target.position.x, target.heading)
+                .lineToXLinearHeading(offsetTarget.position.x, offsetTarget.heading)
                 .build();
 
         }
@@ -487,24 +586,43 @@ public class AutoCommonPaths extends AprilLocater {
     protected void lineTo(MecanumDrive drive, Vector2d target) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
-        final Vector2d deltaPosition = target.minus(currentPos.position);
+        final Vector2d offsetTarget = target;
+        final Vector2d deltaPosition = offsetTarget.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
-            moveToTarget = actionBuilder(drive, currentPos)
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToY(target.y)
+                .lineToY(offsetTarget.y)
                 .build();
 
         } else {
-            moveToTarget = actionBuilder(drive, currentPos)
+            moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToX(target.x)
+                .lineToX(offsetTarget.x)
                 .build();
 
         }
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
 
+    /**
+     * Uses RR to move in a line to the given point. the heading changes 
+     * with the object's current rotationType, resulting at the given target's 
+     * heading. 
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     */
+    protected void lineTo(MecanumDrive drive, Pose2d target) {
+        if(rotationType.equals(RotationType.LINEAR)) {
+            lineToLinearHeading(drive, target);
+        } else if(rotationType.equals(RotationType.SPLINE)) {
+            lineToSplineHeading(drive, target);
+        } else {
+            throw new RuntimeException("Invalid rotationType attribute");
+        }
+    }
+ 
     /**
      * Moves the robot to the ascent zone given the april tag
      * 

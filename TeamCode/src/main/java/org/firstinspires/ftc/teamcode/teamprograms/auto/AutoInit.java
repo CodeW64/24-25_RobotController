@@ -1,7 +1,7 @@
 package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
+import org.firstinspires.ftc.teamcode.teamprograms.teleop.IntoTheDeepTeleop;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
-import com.qualcomm.robotcore.eventloop.opmode.OpMode;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.Range;
@@ -12,12 +12,15 @@ import com.qualcomm.robotcore.hardware.IMU;
  * The {@code Pushbot} class allows for all-direction motion and/or rotation.
  * It contains several methods that allow for motion that can easily 
  * be called autonomously and allow for more precise postioning.
+ * 
+ * <p> The class extends a 
  */
-public class AutoInit extends OpMode {
+abstract public class AutoInit extends IntoTheDeepTeleop {
     /** 
      * Arbitrary value to make motors more controllable.
      */
-    // protected final double MOTOR_TAMING_VALUE = 0.737;
+    @Deprecated
+    protected final double MOTOR_TAMING_VALUE = 0.737;
     
     /**
      * A list of all the motors. Rarely ever used outside of an argument in 
@@ -41,6 +44,8 @@ public class AutoInit extends OpMode {
      * The internal IMU of the robot. Used to measure velocity (and hence 
      * distance) and also rotation. 
      * 
+     * <p> This is likely null, as the IMU is used for positioning, a task 
+     * handled by other classes in the RoadRunner API
      */
     protected IMU imu = null;
 
@@ -122,115 +127,6 @@ public class AutoInit extends OpMode {
     }
     
     /**
-     * Pushes the robot along using the specified vector endicitive of a 
-     * gamepad's {@code left_stick_x} and {@code left_stick_y} properties. 
-     * 
-     * <p>Note: distances are only approximate to real life.
-     * 
-     * <p>Note: distances are only approximate to real life. It depends on the 
-     * accuracy of the {@code WHEEL_DIAMETER} and {@code TICKS_PER_REVOLUTION} 
-     * variables and any slipping of the wheels. 
-     *
-     * @param vx double - The distance left (+) or right (-) in inches
-     * @param vy double - The distance forward (+) or backward (-) in inches
-     */
-    protected void moveBy(double vx, double vy) {
-        // TODO: Fix the moveBy method so that it uses odometry
-        // // Sleeping to give time for resetting. Try removing it to see why.
-        // try {
-        //     Thread.sleep(500);
-        // } catch(InterruptedException err) {
-        //     return;
-        // }
-        
-        // // Finding the powers appropriate for the specified movement
-        // final Gamepad fakeGamepad = new Gamepad();
-        // final double distance = Math.hypot(vx, vy);
-        // fakeGamepad.left_stick_x = (float) (vx / distance); // Dividing distance normalizes the vector
-        // fakeGamepad.left_stick_y = (float) (vy / distance); // Dividing distance normalizes the vector
-        // double[] powers = getDrivePowersFrom(fakeGamepad, 1);
-
-        // // Setting targets
-        // for(short i = 0; i < powers.length; i++) {
-        //     final DcMotorEx motor = driveMotorList[i];
-        //     final double power = powers[i];
-        //     motor.setMode(DcMotorEx.RunMode.STOP_AND_RESET_ENCODER);
-        //     motor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
-        //     motor.setTargetPosition((int) (power * distance / DISTANCE_PER_TICK));
-        //     motor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
-
-        //     /* 
-        //      * Because RUN_TO_POSITION always goes DIRECTLY to the target when the 
-        //      * sign is positive (and this being the disired operation), we always 
-        //      * make sure it is positive.
-        //      * 
-        //      * The value is halved to reduce any problems of high speeds. 
-        //      */
-        //     powers[i] = 0.25 * Math.abs(power);
-        //     telemetry.addData("power" + i, power);
-        // }
-        // telemetry.update();
-
-        // // Driving the motors. 
-        // for(DcMotorEx motor : driveMotorList) {
-        //     motor.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
-        // }
-        // powerDriveMotors(powers);
-        // while(
-        //     driveMotorList[0].isBusy() 
-        //     && driveMotorList[1].isBusy() 
-        //     && driveMotorList[2].isBusy() 
-        //     && driveMotorList[3].isBusy()
-        // ) {
-        //     // Just waiting...
-        // }
-
-        // // Braking the motors
-        // for(DcMotorEx motor : driveMotorList) {
-        //     motor.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER);
-        // }
-        // powerDriveMotors(new double[]{0, 0, 0, 0});
-    }
-    
-    // TODO: Fix the moveForward method so that it uses odometry
-    /**
-     * Pushes the robot along {@code distance} inches forward. Using a negative 
-     * number moves the robot backwards.
-     * 
-     * <p>Note: This method requires that all wheels' motors possess encoders.
-     * 
-     * <p>Note: distances are only approximate to real life. It depends on the 
-     * accuracy of the {@code WHEEL_DIAMETER} and {@code TICKS_PER_REVOLUTION} 
-     * variables and the relaibility of the wheels to travel a distance close to
-     * {@code distance}. 
-     *
-     * @param distance double - The distance forward to move in inches.
-     * @see moveBy()
-     */
-    protected void moveForwardBy(double distance) {
-        moveBy(0, distance); 
-    }
-    
-    /**
-     * Rotates the robot by the specified amount. Units are in radians 
-     * counterclockwise. 
-     * 
-     * @param theta double - Angle measure to rotate counterclockwise (+) or 
-     *        clockwise (-) in radians
-     */
-    protected void rotateBy(double theta) {
-        // TODO: Change rotate by to use odometry
-        // // Sleeping to give time for resetting. Try removing it to see why.
-        // try {
-        //     Thread.sleep(500);
-        // } catch(InterruptedException err) {
-        //     return;
-        // }
-        
-        // final double startRotation = imu.getRobotYawPitchRoll().getYaw(AngleUnit.DEGREES);
-    }
-    
-    /**
      * Takes a list of powers and applies it to the motors in 
      * {@code driveMotorList}.
      * 
@@ -274,7 +170,7 @@ public class AutoInit extends OpMode {
         driveMotorList[1] = hardwareMap.get(DcMotorEx.class, "frontLeft");
         driveMotorList[2] = hardwareMap.get(DcMotorEx.class, "backRight");
         driveMotorList[3] = hardwareMap.get(DcMotorEx.class, "frontRight");
-        imu = hardwareMap.get(IMU.class, "imu");
+        // imu = hardwareMap.get(IMU.class, "imu");
 
         // To drive forward, most robots need the motor on one side to be reversed, 
         // because the axles point in opposite directions.
@@ -321,15 +217,70 @@ public class AutoInit extends OpMode {
     }
     
     /**
+     * Executes code once the INIT button is pressed. Can be overridden by 
+     * subclasses for further user-defined functionality.
      */
-    @Override
-    public void init() {
+    public void opMode_init() {
         initPushBot();
     }
 
+    
+    /**
+     * Executes code continually after the INIT button is pressed and before the 
+     * START button is. Can be overridden by subclasses for user-defined 
+     * functionality.
+     */
+    public void opMode_init_loop() {}
+
+    /**
+     * Executes code once the START button is pressed. Code can be put in here 
+     * in autonomose op modes for do-once upon-start functionality.
+     */
+    abstract public void opMode_start();
+
+    /**
+     * Executes code continually after the START button has been pressed. Meant 
+     * to be overriden for user-defined functionality.
+     */
+    public void opMode_loop() {}
+
+    /**
+     * Executes code once the STOP button has been pressed or is stopped by code.
+     * Can be overriden for user-defined functionality.
+     */
+    public void opMode_stop() {} 
+
+    /**
+     * Implements the opmode structure of the iterative-similar abstract methods.
+     * Those methods 
+     */
     @Override
-    public void loop() {
-        // Meant to be overridden.
-        // 🎶🎷🐛
+    public void runOpMode() {
+        opMode_init();
+
+        while(opModeInInit()) {
+            telemetry.clearAll();
+            opMode_init_loop();
+            telemetry.update();
+        }
+
+        // waitForStart();
+        opMode_start();
+
+        while(opModeIsActive()) {
+            telemetry.clearAll();
+            opMode_loop();
+            telemetry.update();
+        }
+
+        opMode_stop();
+    }
+
+    /**
+     * Executes the runOpMode method in the superclass, a subclass of 
+     * LinearOpMode.
+     */
+    public void runOverridenOpMode() {
+        super.runOpMode();
     }
 }

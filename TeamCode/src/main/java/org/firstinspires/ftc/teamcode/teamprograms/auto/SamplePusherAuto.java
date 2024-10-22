@@ -47,8 +47,8 @@ public class SamplePusherAuto extends AutoCommonPaths {
     final Pose2d START_LOCATION = new Pose2d(-63, 43, Math.toRadians(90));
 
     @Override
-    public void init() {
-        super.init();
+    public void opMode_init() {
+        super.opMode_init();
         
         globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
 
@@ -73,7 +73,7 @@ public class SamplePusherAuto extends AutoCommonPaths {
     }
 
     @Override 
-    public void init_loop() {
+    public void opMode_init_loop() {
         telemetry.addLine("==== POSITIONING NOTES ====");
         telemetry.addLine(
             "The robot should be positioned on the close edge of the tile" +
@@ -110,7 +110,7 @@ public class SamplePusherAuto extends AutoCommonPaths {
     }
 
     @Override
-    public void start() {
+    public void opMode_start() {
         telemetry.clearAll();
         telemetry.setAutoClear(false);
 
@@ -181,7 +181,7 @@ public class SamplePusherAuto extends AutoCommonPaths {
     }
 
     @Override
-    public void stop() {
+    public void opMode_stop() {
         powerDriveMotors(0, 0, 0, 0);
     }
 }
