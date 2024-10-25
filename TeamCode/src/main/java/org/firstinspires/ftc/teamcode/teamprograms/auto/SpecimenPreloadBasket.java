@@ -389,127 +389,129 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         }
     }
 
-    private void main() throws InterruptedException {
-        
-        telemetry.addData("Status", 0);
-        telemetry.update();
-        lift.start();
-        sleep(1000);
-
+    private void extendAsync() throws InterruptedException {
         lift.extendSlides(TWELVE_INCHES_EXTENSION, 20, 0.15);
-        lift.waitForFinish();
+        // life.waitForFinish();
+    }
 
-        // while(!lift.hasSample()) {
-            telemetry.addData("Status", 1);
-            telemetry.update();
-            lift.switchToIntakeMode();
-            sleep(1000);
-        // }
-        
-        telemetry.addData("Status", 2);
-        telemetry.update();
-        lift.extendSlides(FULLY_RETRACTED, 20, -0.6);
-        lift.waitForFinish();
-
-        telemetry.addData("Status", 3);
-        telemetry.update();
-        lift.switchToDepositMode();
-        sleep(3000);
+    private void grabSampleAsync() throws InterruptedException {
         lift.switchToIntakeMode();
-        
+    }
+
+    private void toggleArmToDespitAsync() throws InterruptedException {
+        lift.switchToDepositMode();
+    }
+
+    private void depositSync() throws InterruptedException {
+        lift.switchToIntakeMode();
         lift.setIntakeToHighSpeed();
         sleep(500);
         lift.setIntakeToRestSpeed();
+    }
 
-        lift.switchToDepositMode();
-        sleep(2000);
+    private void grabSample() throws InterruptedException {
+        // TODO: Make this retry if nothing is grabbed
+        grabSampleAsync();
+        sleep(1000);
+    }
 
-        telemetry.addData("Status", "completed");
+    private void berriddenOfSample() throws InterruptedException {
+        // The arm is raised, so put it into the basket!
+        // toggleArmToDespitAsync();
+        depositSync();
+        sleep(500); // To stop from accidentally moving too fast
+        toggleArmToDespitAsync(); // Changing arm position
+    }
+
+    private void raiseArmAsync() throws InterruptedException {
+        toggleArmToDespitAsync();
+    }
+
+    /**
+     * Executes the main code for the robot. This exists so the code isn't 
+     * polluted with try-catches, but can be declared entirely. If an exception 
+     * is thrown, it would only be reasonable in the case of op mode end, where 
+     * we want all function to end anyways. 
+     * 
+     * @throws InterruptedException
+     */
+    private void main() throws InterruptedException {
+        // Completely disabling the idea of hitting buttons
+        toggleBlueSide = null;
+        toggleObservationPark = null;
+        repositionToggle = null;
+
+        // Starting the actual stuffs
+        lift.start();
+
+        // Driving to the net zone
+        // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
+        globalDrive.updatePoseEstimate();
+        moveRobotToNetZone(isBlue);
+        berriddenOfSample();
+
+        // Driving to the spike marks
+        for(int i = 2; i >= 0; i--) {
+            // Initial positioning data
+            final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
+            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = new Pose2d(-6.25, -1, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = new Pose2d(-12, 0, 0);
+            
+            // Finding the offset
+            final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
+            final Vector2d[] rotationMatrix = {
+                new Vector2d(Math.cos(extraRotation), Math.sin(extraRotation)),
+                new Vector2d(-Math.sin(extraRotation), Math.cos(extraRotation))
+            };
+            final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
+            final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+            
+            telemetry.addData("Final Offset", logPose(finalOffset));
+
+            // Moving to grab the sample
+            setDestinationOffset(finalOffset);
+            globalDrive.updatePoseEstimate();
+            moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
+
+            // Grabbing the pixel
+            resetDestinationOffset();
+            grabSample();
+            raiseArmAsync();
+            // TODO: GRab the pixel!
+            
+            // Scoring!
+            globalDrive.updatePoseEstimate();
+            moveRobotToNetZone(isBlue);
+            berriddenOfSample();
+        }
+
+        // Parking
+        telemetry.addData("Status", "Completed!");
         telemetry.update();
-        // telemetry.clearAll();
-        // telemetry.setAutoClear(false);
 
-        // // Completely disabling the idea of hitting buttons
-        // toggleBlueSide = null;
-        // toggleObservationPark = null;
-        // repositionToggle = null;
+        final AprilTagDetection observationZone = getDetection(this.coloredTagId);
+        if(this.shouldParkObservation) {
+            globalDrive.updatePoseEstimate();
+            moveRobotToObservation(observationZone, false); 
+        } else {
+            globalDrive.updatePoseEstimate();
+            moveRobotToAscentZone(observationZone);
+            globalDrive.updatePoseEstimate();
+            attemptAscent(1);
+        }
 
-        // // Starting the actual stuffs
-        // lift.run();
-
-        // // Driving to the net zone
-        // // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
-        // globalDrive.updatePoseEstimate();
-        // moveRobotToNetZone(isBlue);
-
-        // // Driving to the spike marks
-        // for(int i = 2; i >= 0; i--) {
-        //     // Initial positioning data
-        //     final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-        //     final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
-        //     final Pose2d intakeOffset = new Pose2d(-6.25, -1, extraRotation - Math.PI / 2); // Offset from bot center
-        //     final Pose2d grabbingDistance = new Pose2d(-12, 0, 0);
-            
-        //     // Finding the offset
-        //     final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
-        //     final Vector2d[] rotationMatrix = {
-        //         new Vector2d(Math.cos(extraRotation), Math.sin(extraRotation)),
-        //         new Vector2d(-Math.sin(extraRotation), Math.cos(extraRotation))
-        //     };
-        //     final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
-        //     final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
-            
-        //     telemetry.addData("Final Offset", logPose(finalOffset));
-
-        //     // Moving to grab the sample
-        //     setDestinationOffset(finalOffset);
-        //     globalDrive.updatePoseEstimate();
-        //     moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
-
-        //     // Grabbing the pixel
-        //     resetDestinationOffset();
-        //     // TODO: GRab the pixel!
-            
-        //     // Scoring!
-        //     globalDrive.updatePoseEstimate();
-        //     moveRobotToNetZone(isBlue);
-        // }
-
-        // // Parking
-        // telemetry.addData("Status", "Completed!");
-        // telemetry.update();
-
-        // final AprilTagDetection observationZone = getDetection(this.coloredTagId);
-        // if(this.shouldParkObservation) {
-        //     globalDrive.updatePoseEstimate();
-        //     moveRobotToObservation(observationZone, false); 
-        // } else {
-        //     globalDrive.updatePoseEstimate();
-        //     moveRobotToAscentZone(observationZone);
-        //     globalDrive.updatePoseEstimate();
-        //     attemptAscent(1);
-        // }
-
-        // // Yipee! Finishing up
-        // telemetry.addData("Status", "Completed! 🥳");
-        // telemetry.update();
+        // Yipee! Finishing up
+        telemetry.addData("Status", "Completed! 🥳");
+        telemetry.update();
     }
 
     @Override
     public void opMode_start() {
-        (new Thread() {
-            @Override 
-            public void run() {
-                try {
-                    main();
-                } catch (InterruptedException err) {
-                    telemetry.addData("!!CAUGHT ERROR", err);
-                    telemetry.update();
-                }
-            }
-        }).start();
-        while(opModeIsActive()) {
-            telemetry.addData("Runtime", getRuntime());
+        try {
+            main();
+        } catch(InterruptedException err) {
+            telemetry.addData("!! CAUGHT FATAL ERROR", err);
             telemetry.update();
         }
     }

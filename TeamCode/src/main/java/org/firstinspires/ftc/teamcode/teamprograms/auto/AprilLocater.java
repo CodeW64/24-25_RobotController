@@ -80,10 +80,10 @@ abstract public class AprilLocater extends AutoInit {
         aprilTag.setDecimation(3);
 
         // Create the vision portal by using a builder.
-        visionPortal = new VisionPortal.Builder()
-                .setCamera(hardwareMap.get(WebcamName.class, "eyeball"))
-                .addProcessor(aprilTag)
-                .build();
+        // visionPortal = new VisionPortal.Builder()
+        //         .setCamera(hardwareMap.get(WebcamName.class, "eyeball"))
+        //         .addProcessor(aprilTag)
+        //         .build();
     }
 
     /**

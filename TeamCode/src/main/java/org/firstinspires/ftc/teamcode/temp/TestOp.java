@@ -30,7 +30,12 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 @TeleOp(name="Mecanum Positioning OpMode (TestOp)", group="teamcode")
 public class TestOp extends AutoInit {
     @Override 
-    public void loop() {
+    public void opMode_start() {
+        // Nothing imporetanat
+    } 
+
+    @Override 
+    public void opMode_loop() {
         driveWheels();
 
         final YawPitchRollAngles data = imu.getRobotYawPitchRollAngles();
