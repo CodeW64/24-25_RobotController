@@ -9,6 +9,7 @@ import java.util.ArrayList;
 import java.util.concurrent.locks.Condition;
 
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 
@@ -33,6 +34,9 @@ import com.acmerobotics.roadrunner.ftc.Actions;
 import java.util.function.DoubleConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
 
 /**
  * Takes a preloaded sample and pushes it into the net zone. Grabs more neutral
@@ -172,9 +176,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         } 
 
         public void setIntakeToRestSpeed() throws InterruptedException {
-            gamepad2.left_bumper = true;
+            // gamepad2.left_bumper = true;
             sleep(pressDuration);
-            gamepad2.left_bumper = false;
+            // gamepad2.left_bumper = false;
         }
 
         public void reverseIntakeDirection() throws InterruptedException {
@@ -325,6 +329,13 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public void opMode_init() {
         super.opMode_init();
         
+        // telemetry.addData("Real IMU heading (DEG)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.DEGREES));
+        // telemetry.addData("Real IMU heading (RAD)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.RADIANS));
+        // telemetry.addLine();
+        // telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
+        // telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
+        // telemetry.update();
+        
         // Initializing other hardware(-ish) bits
         globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
         linearSlideLift = hardwareMap.get(DcMotorEx.class, "linearSlideLift");
@@ -389,42 +400,151 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         }
     }
 
+    /**
+     * Extends the slides to a length of approx 12 inches. 
+     * 
+     * <p> To use this as a blocking method, call afterwards 
+     * lift.waitForFinish(). If that's called, this takes about 2000 ms.
+     * 
+     * @throws InterruptedException
+     */
     private void extendAsync() throws InterruptedException {
         lift.extendSlides(TWELVE_INCHES_EXTENSION, 20, 0.15);
-        // life.waitForFinish();
     }
 
+    /**
+     * Retracts the arm. 
+     * 
+     * <p> To convert this to a blocking method, call the method 
+     * lift.waitForFinish(). If that's called, this takes about 2000 ms.
+     * 
+     * @throws InterruptedException
+     */
+    private void retractAsync() throws InterruptedException {
+        lift.extendSlides(FULLY_RETRACTED, 20, -0.4);
+    }
+
+    /**
+     * Attempts to move and power the intake so that a sample is grabbed. The 
+     * arm must be extended to position to grab. The arm remains extended 
+     * afterwards.
+     * 
+     * <p> Estimated asynchronous time: 500 ms
+     * 
+     * @throws InterruptedException
+     */
     private void grabSampleAsync() throws InterruptedException {
-        lift.switchToIntakeMode();
+        // lift.setIntakeToHighSpeed();
+        // gamepad2.right_bumper = true;
+        gamepad2.right_trigger = 1.0f; // Move to intake position
+        sleep(100);
+        // gamepad2.right_bumper = false;
+        gamepad2.right_trigger = 0;
+        // lift.switchToIntakeMode();
     }
 
-    private void toggleArmToDespitAsync() throws InterruptedException {
-        lift.switchToDepositMode();
+    /**
+     * Toggles the pivot between intake and deposit mode.
+     * 
+     * <p> Estimated async completion time: 2000 ms
+     * 
+     * @throws InterruptedException
+     */
+    private void toggleArmToDepositAsync() throws InterruptedException {
+        gamepad2.left_trigger = 1.0f;
+        sleep(100);
+        gamepad2.left_trigger = 0;
     }
 
-    private void depositSync() throws InterruptedException {
-        lift.switchToIntakeMode();
-        lift.setIntakeToHighSpeed();
-        sleep(500);
-        lift.setIntakeToRestSpeed();
+    /**
+     * Puts the held sample into the bucket. The arm must be in position, but 
+     * the intake should be not ready. The pivot is not affected.
+     * 
+     * <p> Estimated async completion time: 500 ms
+     * 
+     * @throws InterruptedException
+     */
+    private void depositAsync() throws InterruptedException {
+        gamepad2.right_trigger = 1.0f; // Move intake for desposit
+        gamepad2.right_bumper = true; // Deposit
+        sleep(100);
+        gamepad2.right_trigger = 0;
+        gamepad2.right_bumper = false;
+    }
+    
+    /**
+     * Extends the arm to the buckets when in deposit.
+     * 
+     * <p> Estimated async completion time: 3000 ms
+     */
+    private void extendToBucketsAsync() {
+        lift.extendSlides(
+           (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeight, 
+           10, 
+           0.2
+        );
     }
 
-    private void grabSample() throws InterruptedException {
+    /**
+     * Extends the arm and grabs the sample. The distance is fixed. The arm 
+     * attempts the grab only once. The arm remains extended afterwards.
+     * 
+     * <p> Estimated blocking runtime: 2750 ms
+     *  
+     * @throws InterruptedException
+     */
+    private void grabSampleSync() throws InterruptedException {
         // TODO: Make this retry if nothing is grabbed
-        grabSampleAsync();
-        sleep(1000);
+        extendAsync();
+        lift.waitForFinish(); // Waiting for full extension
+        grabSampleAsync(); // Grab the sample
+        sleep(750); // Wait for completion
     }
 
+    /**
+     * Puts the sample in the bucket. The arm is lowered afterwards. Must be 
+     * fully raised when called.
+     * 
+     * <p> Estimated blocking runtime: 2500 ms
+     */
     private void berriddenOfSample() throws InterruptedException {
         // The arm is raised, so put it into the basket!
-        // toggleArmToDespitAsync();
-        depositSync();
+        depositAsync();
         sleep(500); // To stop from accidentally moving too fast
-        toggleArmToDespitAsync(); // Changing arm position
+        toggleArmToDepositAsync(); // Changing arm position
+        sleep(2000);
     }
 
-    private void raiseArmAsync() throws InterruptedException {
-        toggleArmToDespitAsync();
+    /**
+     * Retracts the arm fully and switches the arm position. The arm becomes
+     * fully retracted.
+     * 
+     * <p> Estimated async completion time: 2000 ms
+     * 
+     * @throws InterruptedException
+     */
+    private void switchArmAsync() throws InterruptedException {
+        // Retraction is automatically handled by this method
+        toggleArmToDepositAsync();
+    }
+
+    /**
+     * Moves the robot forward in the direction towards the net. Specifically, 
+     * the angle is 135 deg CCW from the global x-axis.The distance traveled is 
+     * approx the given dist.
+     * 
+     * @param dist How far to travel.
+     */
+    private void netMoveSync(double dist) {
+        final Vector2d curPos = getCurrentPosition().position;
+        final Vector2d offset = (new Vector2d(
+            -dist / Math.sqrt(2), 
+            dist / Math.sqrt(2)
+        ));
+        lineTo(
+            globalDrive, 
+            curPos.plus(offset) // Move forward dist inches 
+        );
     }
 
     /**
@@ -446,17 +566,25 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // Driving to the net zone
         // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);
+        final long SWITCH_TIME = 2500;
         globalDrive.updatePoseEstimate();
         moveRobotToNetZone(isBlue);
-        berriddenOfSample();
+
+        // Putting the preloaded sample into the basket
+        switchArmAsync(); // Get the arm up
+        sleep(SWITCH_TIME); 
+        extendToBucketsAsync(); // Extend there
+        lift.waitForFinish();
+        netMoveSync(8); // Move forward 8 inches
+        berriddenOfSample(); // Aaaaand deposit and return!
 
         // Driving to the spike marks
-        for(int i = 2; i >= 0; i--) {
+        for(int i = 2; i >= 2 && opModeIsActive(); i--) { // TODO: This only does first. Change it to adapt!
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
             final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = new Pose2d(-6.25, -1, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(-12, 0, 0);
+            final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = new Pose2d(-16, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -467,8 +595,6 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
             final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
             
-            telemetry.addData("Final Offset", logPose(finalOffset));
-
             // Moving to grab the sample
             setDestinationOffset(finalOffset);
             globalDrive.updatePoseEstimate();
@@ -476,17 +602,26 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
             // Grabbing the pixel
             resetDestinationOffset();
-            grabSample();
-            raiseArmAsync();
-            // TODO: GRab the pixel!
+            grabSampleSync(); // Grab the pixel. and retract
+            retractAsync();
+            lift.waitForFinish();
+            switchArmAsync(); // Switch the arm up; completed by travel time
             
             // Scoring!
             globalDrive.updatePoseEstimate();
             moveRobotToNetZone(isBlue);
+            extendToBucketsAsync();
+            lift.waitForFinish();
+            netMoveSync(8); // inches 
             berriddenOfSample();
         }
 
-        // Parking
+        // Putting the arm into position zero
+        linearSlidePivot.setTargetPosition(0);
+        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        linearSlidePivot.setPower(1.0);
+
+        /*// Parking
         telemetry.addData("Status", "Completed!");
         telemetry.update();
 
@@ -499,7 +634,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             moveRobotToAscentZone(observationZone);
             globalDrive.updatePoseEstimate();
             attemptAscent(1);
-        }
+        }*/
 
         // Yipee! Finishing up
         telemetry.addData("Status", "Completed! 🥳");
@@ -509,6 +644,22 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     @Override
     public void opMode_start() {
         try {
+            // Thread t = (new Thread() {
+
+            //     @Override
+            //     public void run() {
+            //         while(true) {
+            //             telemetry.addData("Real IMU heading (DEG)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.DEGREES));
+            //             telemetry.addData("Real IMU heading (RAD)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.RADIANS));
+            //             telemetry.addLine();
+            //             telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
+            //             telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
+            //             telemetry.update();
+            //         }
+            //     }
+            // });
+            // t.setDaemon(true);
+            // t.start();
             main();
         } catch(InterruptedException err) {
             telemetry.addData("!! CAUGHT FATAL ERROR", err);

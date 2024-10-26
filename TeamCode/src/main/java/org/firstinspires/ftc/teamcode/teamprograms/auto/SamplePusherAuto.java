@@ -20,6 +20,9 @@ import org.firstinspires.ftc.vision.VisionPortal;
 import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
 import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
@@ -74,6 +77,13 @@ public class SamplePusherAuto extends AutoCommonPaths {
 
     @Override 
     public void opMode_init_loop() {
+        telemetry.addData("Real IMU heading (DEG)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.DEGREES));
+        telemetry.addData("Real IMU heading (RAD)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.RADIANS));
+        telemetry.addLine();
+        telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
+        telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
+        telemetry.update();
+
         telemetry.addLine("==== POSITIONING NOTES ====");
         telemetry.addLine(
             "The robot should be positioned on the close edge of the tile" +
@@ -112,12 +122,29 @@ public class SamplePusherAuto extends AutoCommonPaths {
     @Override
     public void opMode_start() {
         telemetry.clearAll();
-        telemetry.setAutoClear(false);
+        // telemetry.setAutoClear(false);
 
         // Completely disabling the idea of hitting buttons
         toggleBlueSide = null;
         toggleObservationPark = null;
         repositionToggle = null;
+
+        // Thread t = (new Thread() {
+
+        //     @Override
+        //     public void run() {
+        //         while(true) {
+        //             telemetry.addData("Real IMU heading (DEG)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.DEGREES));
+        //             telemetry.addData("Real IMU heading (RAD)", globalDrive.bildaDriver.getPosition().getHeading(AngleUnit.RADIANS));
+        //             telemetry.addLine();
+        //             telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
+        //             telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
+        //             telemetry.update();
+        //         }
+        //     }
+        // });
+        // t.setDaemon(true);
+        // t.start();
 
         // Driving to the net zone
         // final AprilTagDetection netZoneInitial = getDetection(this.neutralTagId);

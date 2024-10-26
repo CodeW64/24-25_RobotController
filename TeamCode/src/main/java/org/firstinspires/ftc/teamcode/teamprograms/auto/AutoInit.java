@@ -1,6 +1,5 @@
 package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
-import org.firstinspires.ftc.teamcode.teamprograms.teleop.IntoTheDeepTeleop;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
@@ -15,7 +14,7 @@ import com.qualcomm.robotcore.hardware.IMU;
  * 
  * <p> The class extends a 
  */
-abstract public class AutoInit extends IntoTheDeepTeleop {
+abstract public class AutoInit extends AutoArmRunner {
     /** 
      * Arbitrary value to make motors more controllable.
      */

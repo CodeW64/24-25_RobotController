@@ -1,4 +1,4 @@
-package org.firstinspires.ftc.teamcode.teamprograms.teleop;
+package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
 import com.acmerobotics.dashboard.config.Config;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
@@ -68,9 +68,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  * [dpad_down + a_button] - exit MANUAL_OVERRIDE
  */
 
-@TeleOp(name = "The S.S. Steve's Maiden Voyage", group = "A")
 @Config
-public class IntoTheDeepTeleop extends LinearOpMode {
+public class AutoArmRunner extends LinearOpMode {
 
 
     // HARDWARE

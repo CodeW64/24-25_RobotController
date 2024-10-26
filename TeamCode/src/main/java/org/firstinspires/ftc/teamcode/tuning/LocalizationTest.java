@@ -14,6 +14,9 @@ import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.TankDrive;
 import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
+
 public class LocalizationTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
@@ -36,6 +39,12 @@ public class LocalizationTest extends LinearOpMode {
                 drive.updatePoseEstimate();
 
 
+                telemetry.addData("Real IMU heading (DEG)", drive.bildaDriver.getPosition().getHeading(AngleUnit.DEGREES));
+                telemetry.addData("Real IMU heading (RAD)", drive.bildaDriver.getPosition().getHeading(AngleUnit.RADIANS));
+                telemetry.addLine();
+                telemetry.addData("Real IMU heading Vel (DEG)", drive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
+                telemetry.addData("Real IMU heading Vel (RAD)", drive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
+                telemetry.addLine();
                 telemetry.addData("x", drive.pose.position.x);
                 telemetry.addData("y", drive.pose.position.y);
                 telemetry.addData("heading (deg)", Math.toDegrees(drive.pose.heading.toDouble()));

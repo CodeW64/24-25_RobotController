@@ -43,6 +43,8 @@ public final class RRGobildaLocalizer implements Localizer {
     public final GoBildaPinpointDriver bildaDriver; // this replaces the REV internal IMU
     //    public final IMU imu;
 
+    private Twist2dDual<Time> lastTwist;
+
     private int lastParPos, lastPerpPos;
     private Rotation2d lastHeading;
 
@@ -115,6 +117,11 @@ public final class RRGobildaLocalizer implements Localizer {
             lastPerpPos = perpPosVel.position;
             lastHeading = heading;
 
+            lastTwist = new Twist2dDual<>(
+                Vector2dDual.constant(new Vector2d(0.0, 0.0), 2),
+                DualNum.constant(0.0, 2)
+            );
+
             return new Twist2dDual<>(
                     Vector2dDual.constant(new Vector2d(0.0, 0.0), 2),
                     DualNum.constant(0.0, 2)
@@ -127,6 +134,9 @@ public final class RRGobildaLocalizer implements Localizer {
         int parPosDelta = parPosVel.position - lastParPos;
         int perpPosDelta = perpPosVel.position - lastPerpPos;
 
+        if(Double.isNaN(headingDelta) || Double.isNaN(headingVel)) {
+                return lastTwist;
+        }
 
         Twist2dDual<Time> twist = new Twist2dDual<>(
                 new Vector2dDual<>(
@@ -148,6 +158,7 @@ public final class RRGobildaLocalizer implements Localizer {
         lastParPos = parPosVel.position;
         lastPerpPos = perpPosVel.position;
         lastHeading = heading;
+        lastTwist = twist;
 
         return twist;
     }
