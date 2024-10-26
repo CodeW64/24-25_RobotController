@@ -147,6 +147,7 @@ public final class MecanumDrive {
 
 
     public Pose2d pose;
+    public boolean hasReturnedNaN = false;
 
     private final LinkedList<Pose2d> poseHistory = new LinkedList<>();
 
@@ -328,6 +329,10 @@ public final class MecanumDrive {
             Pose2dDual<Time> txWorldTarget = timeTrajectory.get(t);
             targetPoseWriter.write(new PoseMessage(txWorldTarget.value()));
             PoseVelocity2d robotVelRobot = updatePoseEstimate();
+            // FIXME: normally not here
+            if (robotVelRobot == null) {
+                return true;
+            }
             Pose2d error = txWorldTarget.value().minusExp(pose);
 
             // TODO: find the right tolerances
@@ -455,6 +460,10 @@ public final class MecanumDrive {
             targetPoseWriter.write(new PoseMessage(txWorldTarget.value()));
 
             PoseVelocity2d robotVelRobot = updatePoseEstimate();
+            // FIXME: normally not here
+            if (robotVelRobot == null) {
+                return true;
+            }
 
             PoseVelocity2dDual<Time> command = new HolonomicController(
                     PARAMS.axialGain, PARAMS.lateralGain, PARAMS.headingGain,
@@ -504,6 +513,13 @@ public final class MecanumDrive {
 
     public PoseVelocity2d updatePoseEstimate() {
         Twist2dDual<Time> twist = localizer.update();
+
+        // FIXME: normally not here
+        if (Double.isNaN(twist.value().angle)) {
+            hasReturnedNaN = true;
+            return null;
+        }
+
         pose = pose.plus(twist.value());
 
         poseHistory.add(pose);

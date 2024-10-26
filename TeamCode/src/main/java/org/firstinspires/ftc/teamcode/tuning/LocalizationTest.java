@@ -9,10 +9,13 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.teamcode.Drawing;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.TankDrive;
 import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer;
+import org.firstinspires.ftc.teamcode.gobilda.RRGobildaLocalizer;
 
 public class LocalizationTest extends LinearOpMode {
     @Override
@@ -24,6 +27,8 @@ public class LocalizationTest extends LinearOpMode {
 
             waitForStart();
 
+            telemetry.setMsTransmissionInterval(33);
+
             while (opModeIsActive()) {
                 drive.setDrivePowers(new PoseVelocity2d(
                         new Vector2d(
@@ -34,8 +39,20 @@ public class LocalizationTest extends LinearOpMode {
                 ));
 
                 drive.updatePoseEstimate();
+                Pose2D bildaPos = drive.bildaDriver.getPosition();
+                Pose2D bildaVel = drive.bildaDriver.getVelocity();
 
 
+
+                telemetry.addData("goBilda IMU direct heading (DEG)", bildaPos.getHeading(AngleUnit.DEGREES));
+                telemetry.addData("goBilda IMU direct heading (RAD)", bildaPos.getHeading(AngleUnit.RADIANS));
+                telemetry.addData("goBilda IMU direct velocity (DEG)", bildaVel.getHeading(AngleUnit.DEGREES));
+                telemetry.addData("goBilda IMU direct velocity (RAD)", bildaVel.getHeading(AngleUnit.RADIANS));
+                if (drive.localizer instanceof RRGobildaLocalizer) {
+                    telemetry.addData("goBilda IMU hasReturnedNaN", ((RRGobildaLocalizer) drive.localizer).hasReturnedNaN);
+                }
+                telemetry.addData("Drive Pose hasReturnedNaN", drive.hasReturnedNaN);
+                telemetry.addLine("--------------------------------");
                 telemetry.addData("x", drive.pose.position.x);
                 telemetry.addData("y", drive.pose.position.y);
                 telemetry.addData("heading (deg)", Math.toDegrees(drive.pose.heading.toDouble()));
