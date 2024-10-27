@@ -14,7 +14,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 @Config
 @TeleOp(group = "Z")
-public class findLiftValues extends LinearOpMode {
+public class FindLiftValues extends LinearOpMode {
 
     DcMotorEx linearSlideLift, linearSlidePivot;
     Servo intakePivot;

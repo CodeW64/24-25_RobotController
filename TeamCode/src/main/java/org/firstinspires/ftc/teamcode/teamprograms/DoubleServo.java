@@ -1,16 +1,19 @@
 package org.firstinspires.ftc.teamcode.teamprograms;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.Servo;
 
 @TeleOp(name = "Double Servo", group = "Z")
+@Disabled
+@Deprecated
 public class DoubleServo extends LinearOpMode {
 
     Servo servoRight, servoLeft;
 
 
-// TODO: CURRENTLY NOT SET UP FOR DOUBLE SERVO LIFT
+// CURRENTLY NOT SET UP FOR DOUBLE SERVO LIFT
 
     public void runOpMode() {
 
@@ -31,7 +34,7 @@ public class DoubleServo extends LinearOpMode {
         while (opModeIsActive()) {
 
 
-            // TODO: INDIVIDUAL SERVOS (comment out if needed)
+            // INDIVIDUAL SERVOS (comment out if needed)
             // right servo movement
 //            if (gamepad1.x) {
 //                servoRight.setPosition(0);
@@ -49,7 +52,7 @@ public class DoubleServo extends LinearOpMode {
 //                servoLeft.setPosition(1);
 //            }
 
-            // TODO: DOUBLE SERVO (comment out if needed)
+            // DOUBLE SERVO (comment out if needed)
             if (gamepad1.x) {
                 servoRight.setPosition(0);
                 servoLeft.setPosition(0);

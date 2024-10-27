@@ -7,7 +7,7 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 @TeleOp(group = "Z")
-public class findDrivetrainValues extends LinearOpMode {
+public class FindDrivetrainValues extends LinearOpMode {
 
     DcMotorEx frontRight, backRight, frontLeft, backLeft;
 

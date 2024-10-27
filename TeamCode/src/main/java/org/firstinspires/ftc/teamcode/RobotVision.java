@@ -87,8 +87,8 @@ public class RobotVision {
     private final Telemetry telemetry;
 
 
-    private boolean usingAprilTag;
-    private boolean usingTensorflow;
+    private final boolean usingAprilTag;
+    private final boolean usingTensorflow;
     private boolean initialized;
 
 
@@ -125,8 +125,8 @@ public class RobotVision {
 
 
 
-    // TODO: Reformat method for new season
-    /**
+
+    /*
      * @return path value for autonomous mode.
      */
     /*public int scanForTensorflowRecognitions(AllianceSpecific alliance) {
@@ -197,6 +197,7 @@ public class RobotVision {
 
 
     /**
+     * Detects AprilTags and stores them for later use.
      * @param tagID set to -1 to detect any tag and choose the first one found
      * @return whether it found the tag or not
      */
@@ -236,6 +237,9 @@ public class RobotVision {
         }
     }
 
+    /**
+     * Used in Autonomous only
+     */
     @Deprecated
     public void search(Direction direction, double power) {
 
@@ -256,6 +260,9 @@ public class RobotVision {
 
     }
 
+    /**
+     * Used in Autonomous only
+     */
     public void search(Direction direction) {
         double power = 0.2;
 
@@ -285,6 +292,7 @@ public class RobotVision {
     }
 
 
+    @Deprecated
     public void driveToAprilTag(double offsetDistance) {
         // in case anything slips through
         if (desiredTag == null) return;
@@ -335,7 +343,65 @@ public class RobotVision {
     }
 
 
+    /**
+     * Requires a tag from <strong>detectAprilTag()</strong> to run
+     * @param offsetDistance changes how far away robot will be from the AprilTag
+     * @param offsetBearing changes drivetrain relation of pointing directly at the AprilTag
+     * @param offsetYaw changes robot's offset from the center of the AprilTag
+     */
+    public void driveToAprilTag(double offsetDistance, double offsetBearing, double offsetYaw) {
+        // in case anything slips through
+        if (desiredTag == null) return;
 
+        // Determine heading, range and Yaw (tag image rotation) error so we can use them to control the robot automatically.
+        double  rangeError      = (desiredTag.ftcPose.range - offsetDistance);
+        double  headingError    = (desiredTag.ftcPose.bearing - offsetBearing);
+        double  yawError        = (desiredTag.ftcPose.yaw- offsetYaw);
+        double x;
+        double yaw;
+        double y;
+
+        // Use the speed and turn "gains" to calculate how we want the robot to move.
+        if (Math.abs(rangeError) < 2) {
+            x  = Range.clip(rangeError * SPEED_GAIN, -CORRECTION_AUTO_SPEED, CORRECTION_AUTO_SPEED); // drive
+            yaw   = Range.clip(headingError * TURN_GAIN, -CORRECTION_AUTO_TURN, CORRECTION_AUTO_TURN) ; // turn
+            y = Range.clip(-yawError * STRAFE_GAIN, -CORRECTION_AUTO_STRAFE, CORRECTION_AUTO_STRAFE); // strafe
+        } else {
+            x  = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED); // drive
+            yaw   = Range.clip(headingError * TURN_GAIN, -MAX_AUTO_TURN, MAX_AUTO_TURN) ; // turn
+            y = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE); // strafe
+        }
+
+        // Calculate wheel powers.
+        double leftFrontPower    =  x -y -yaw;
+        double rightFrontPower   =  x +y +yaw;
+        double leftBackPower     =  x +y -yaw;
+        double rightBackPower    =  x -y +yaw;
+
+        // Normalize wheel powers to be less than 1.0
+        double max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
+        max = Math.max(max, Math.abs(leftBackPower));
+        max = Math.max(max, Math.abs(rightBackPower));
+
+        if (max > 1.0) {
+            leftFrontPower /= max;
+            rightFrontPower /= max;
+            leftBackPower /= max;
+            rightBackPower /= max;
+        }
+
+        // Send powers to the wheels.
+        leftFrontDrive.setPower(leftFrontPower);
+        rightFrontDrive.setPower(rightFrontPower);
+        leftBackDrive.setPower(leftBackPower);
+        rightBackDrive.setPower(rightBackPower);
+
+    }
+
+
+    /**
+     * Used for Autonomous
+     */
     public void stopDrivetrain() {
         leftFrontDrive.setPower(0);
         rightFrontDrive.setPower(0);
@@ -369,6 +435,7 @@ public class RobotVision {
                 .setModelLabels(LABELS)
                 .build();
     }*/
+
 
     private void initVisionPortal() {
         // Create the vision portal by using a builder.
