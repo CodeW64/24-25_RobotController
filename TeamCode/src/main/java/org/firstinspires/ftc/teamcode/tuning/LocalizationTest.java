@@ -17,6 +17,9 @@ import org.firstinspires.ftc.teamcode.TankDrive;
 import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer;
 import org.firstinspires.ftc.teamcode.gobilda.RRGobildaLocalizer;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
+
+
 public class LocalizationTest extends LinearOpMode {
     @Override
     public void runOpMode() throws InterruptedException {
@@ -43,7 +46,6 @@ public class LocalizationTest extends LinearOpMode {
                 Pose2D bildaVel = drive.bildaDriver.getVelocity();
 
 
-
                 telemetry.addData("goBilda IMU direct heading (DEG)", bildaPos.getHeading(AngleUnit.DEGREES));
                 telemetry.addData("goBilda IMU direct heading (RAD)", bildaPos.getHeading(AngleUnit.RADIANS));
                 telemetry.addData("goBilda IMU direct velocity (DEG)", bildaVel.getHeading(AngleUnit.DEGREES));
@@ -53,6 +55,7 @@ public class LocalizationTest extends LinearOpMode {
                 }
                 telemetry.addData("Drive Pose hasReturnedNaN", drive.hasReturnedNaN);
                 telemetry.addLine("--------------------------------");
+
                 telemetry.addData("x", drive.pose.position.x);
                 telemetry.addData("y", drive.pose.position.y);
                 telemetry.addData("heading (deg)", Math.toDegrees(drive.pose.heading.toDouble()));

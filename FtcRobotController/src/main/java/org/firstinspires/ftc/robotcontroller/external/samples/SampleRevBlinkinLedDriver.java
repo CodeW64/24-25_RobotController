@@ -42,7 +42,7 @@ import java.util.concurrent.TimeUnit;
  * This OpMode demonstrates use of the REV Robotics Blinkin LED Driver.
  * AUTO mode cycles through all of the patterns.
  * MANUAL mode allows the user to manually change patterns using the
- * left and right bumpers of a gamepad.
+ * left and right bumpers of a gamepad1.
  *
  * Configure the driver on a servo port, and name it "blinkin".
  *

@@ -279,10 +279,10 @@ The readme.md file located in the [/TeamCode/src/main/java/org/firstinspires/ftc
     * [AprilTag Test Images](https://ftc-docs.firstinspires.org/apriltag-test-images)
     * [Camera Calibration](https://ftc-docs.firstinspires.org/camera-calibration)
 * Adds Driver Station support for Logitech Dual Action and Sony PS5 DualSense gamepads.
-    * This **does not** include support for the Sony PS5 DualSense Edge gamepad.
+    * This **does not** include support for the Sony PS5 DualSense Edge gamepad1.
     * Always refer to Game Manual 1 to determine gamepad legality in competition.
 * Adds support for MJPEG payload streaming to UVC driver (external JPEG decompression routine required for use).
-* Shows a hint on the Driver Station UI about how to bind a gamepad when buttons are pressed or the sticks are moved on an unbound gamepad.
+* Shows a hint on the Driver Station UI about how to bind a gamepad when buttons are pressed or the sticks are moved on an unbound gamepad1.
 * Adds option for fullscreening "Camera Stream" on Driver Station.
 * OnBotJava source code is automatically saved as a ZIP file on every build with a rolling window of the last 30 builds kept; allows recovering source code from previous builds if code is accidentally deleted or corrupted.
 * Adds support for changing the addresses of Expansion Hubs that are not connected directly via USB.
@@ -457,7 +457,7 @@ This is a bug fix only release to address the following four issues.
 * Fixes [issue #316](https://github.com/FIRST-Tech-Challenge/FtcRobotController/issues/316) (MatrixF.inverted() returned an incorrectly-sized matrix for 1x1 and 2x2 matrixes).
 * Self inspect now allows for Driver Station and Robot Controller compatibility between point releases.
 * Fixes bug where if the same `RumbleEffect` object instance was queued for multiple gamepads, it
-  could happen that both rumble commands would be sent to just one gamepad.
+  could happen that both rumble commands would be sent to just one gamepad1.
 * Fixes bug in Driver Station where on the Driver Hub, if Advanced Gamepad Features was disabled and
   an officially supported gamepad was connected, then opening the Advanced Gamepad Features or
   Gamepad Type Overrides screens would cause the gamepad to be rebound by the custom USB driver even
@@ -1531,7 +1531,7 @@ Changes include:
  * Fixed timer UI issue
  * Fixed duplicate name UI bug (Legacy Module configuration).
  * Fixed race condition in EventLoopManager.
- * Fix to keep references stable when updating gamepad.
+ * Fix to keep references stable when updating gamepad1.
  * For legacy Matrix motor/servo controllers removed necessity of appending "Motor" and "Servo" to controller names.
  * Updated HT color sensor driver to use constants from ModernRoboticsUsbLegacyModule class.
  * Updated MR color sensor driver to use constants from ModernRoboticsUsbDeviceInterfaceModule class.
