@@ -21,7 +21,12 @@ import org.firstinspires.ftc.teamcode.Localizer;
 import org.firstinspires.ftc.teamcode.messages.RRGoBildaInputsMessage;
 
 
+/*
+ half-baked version of implementing the goBILDA odometry computer into roadrunner
+ */
+
 @Config
+@Deprecated
 public final class RRGobildaLocalizer implements Localizer {
     public static class Params {
 

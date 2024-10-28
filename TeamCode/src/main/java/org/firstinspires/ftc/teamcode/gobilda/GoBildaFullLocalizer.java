@@ -15,12 +15,13 @@ import com.acmerobotics.roadrunner.ftc.RawEncoder;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.HardwareMap;
 
-import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
-import org.firstinspires.ftc.robotcore.external.navigation.Pose2D;
 import org.firstinspires.ftc.teamcode.Localizer;
 import org.firstinspires.ftc.teamcode.messages.GoBildaFullInputsMessage;
-import org.firstinspires.ftc.teamcode.messages.RRGoBildaInputsMessage;
 
+/*
+    localizer fully abandons roadrunner's way of grabbing pose
+    in favor of the goBILDA pinpoint odometry computer
+ */
 
 @Config
 public final class GoBildaFullLocalizer implements Localizer {
@@ -36,10 +37,8 @@ public final class GoBildaFullLocalizer implements Localizer {
 
     public static Params PARAMS = new Params();
 
-    public final Encoder par, perp;
 
-    public final GoBildaPinpointDriver bildaDriver; // this replaces the REV internal IMU
-    //    public final IMU imu;
+    public final GoBildaPinpointDriver bildaDriver; // this replaces the REV internal IMU and encoders
 
     private int lastParPos, lastPerpPos;
     private Rotation2d lastHeading;
@@ -52,12 +51,9 @@ public final class GoBildaFullLocalizer implements Localizer {
 
     public GoBildaFullLocalizer(HardwareMap hardwareMap, GoBildaPinpointDriver bildaDriver, double inPerTick) {
 
-        par = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "backRight")));
-        perp = new OverflowEncoder(new RawEncoder(hardwareMap.get(DcMotorEx.class, "frontRight")));
-
         this.bildaDriver = bildaDriver;
 
-        bildaDriver.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
+        bildaDriver.setEncoderResolution(1.0); // so velocity outputs are raw
 
         bildaDriver.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
                 GoBildaPinpointDriver.EncoderDirection.FORWARD);
@@ -71,32 +67,21 @@ public final class GoBildaFullLocalizer implements Localizer {
     }
 
     public Twist2dDual<Time> update() {
-        PositionVelocityPair parPosVel = par.getPositionAndVelocity();
-        PositionVelocityPair perpPosVel = perp.getPositionAndVelocity();
 
-//        YawPitchRollAngles angles = imu.getRobotYawPitchRollAngles();
-//        AngularVelocity angularVelocity = imu.getRobotAngularVelocity(AngleUnit.RADIANS);
-
-
-//        FlightRecorder.write("TWO_DEAD_WHEEL_INPUTS", new TwoDeadWheelInputsMessage(parPosVel, perpPosVel, angles, angularVelocity));
-
-
+        // get pinpoint driver pose/velocity data
         bildaDriver.update();
-//        Pose2D bildaPos = bildaDriver.getPosition();
-//        Pose2D bildaVel = bildaDriver.getVelocity();
-        int bildaXPos = bildaDriver.getEncoderX();
-        int bildaYPos = bildaDriver.getEncoderY();
+        int bildaParXPos = bildaDriver.getEncoderX();
+        int bildaPerpYPos = bildaDriver.getEncoderY();
         double bildaHeading = bildaDriver.getHeading();
-        // TODO: x and y return mm/s velocity; make it raw value
-        double bildaXVel = bildaDriver.getVelX();
-        double bildaYVel = bildaDriver.getVelY();
+        double bildaParXVel = bildaDriver.getVelX();
+        double bildaPerpYVel = bildaDriver.getVelY();
         double bildaHeadingVel = bildaDriver.getHeadingVelocity();
 
-        FlightRecorder.write("GOBILDA_FULL_INPUTS", new GoBildaFullInputsMessage(bildaXPos,
-                bildaYPos, bildaHeading, bildaXVel, bildaYVel, bildaHeadingVel));
+        FlightRecorder.write("GOBILDA_FULL_INPUTS", new GoBildaFullInputsMessage(bildaParXPos,
+                bildaPerpYPos, bildaHeading, bildaParXVel, bildaPerpYVel, bildaHeadingVel));
 
 
-//        Rotation2d heading = Rotation2d.exp(angles.getYaw(AngleUnit.RADIANS));
+
         double currentHeadingAngle = bildaHeading;
         currentHeadingAngle = Math.floor(currentHeadingAngle * 100) / 100;
         Rotation2d heading = Rotation2d.exp(currentHeadingAngle);
@@ -107,8 +92,9 @@ public final class GoBildaFullLocalizer implements Localizer {
         if (!initialized) {
             initialized = true;
 
-            lastParPos = parPosVel.position;
-            lastPerpPos = perpPosVel.position;
+
+            lastParPos = bildaParXPos;
+            lastPerpPos = bildaPerpYPos;
             lastHeading = heading;
 
             lastTwist = new Twist2dDual<>(
@@ -125,8 +111,8 @@ public final class GoBildaFullLocalizer implements Localizer {
 
 
 
-        int parPosDelta = parPosVel.position - lastParPos;
-        int perpPosDelta = perpPosVel.position - lastPerpPos;
+        int parPosDelta = bildaParXPos - lastParPos;
+        int perpPosDelta = bildaPerpYPos - lastPerpPos;
         double headingDelta = heading.minus(lastHeading);
 
         if (Double.isNaN(headingDelta) || Double.isNaN(headingVel)) {
@@ -138,11 +124,11 @@ public final class GoBildaFullLocalizer implements Localizer {
                 new Vector2dDual<>(
                         new DualNum<Time>(new double[] {
                                 parPosDelta - PARAMS.parYTicks * headingDelta,
-                                parPosVel.velocity - PARAMS.parYTicks * headingVel,
+                                bildaParXVel - PARAMS.parYTicks * headingVel,
                         }).times(inPerTick),
                         new DualNum<Time>(new double[] {
                                 perpPosDelta - PARAMS.perpXTicks * headingDelta,
-                                perpPosVel.velocity - PARAMS.perpXTicks * headingVel,
+                                bildaPerpYVel - PARAMS.perpXTicks * headingVel,
                         }).times(inPerTick)
                 ),
                 new DualNum<>(new double[] {
@@ -151,8 +137,8 @@ public final class GoBildaFullLocalizer implements Localizer {
                 })
         );
 
-        lastParPos = parPosVel.position;
-        lastPerpPos = perpPosVel.position;
+        lastParPos = bildaParXPos;
+        lastPerpPos = bildaPerpYPos;
         lastHeading = heading;
         lastTwist = twist;
 

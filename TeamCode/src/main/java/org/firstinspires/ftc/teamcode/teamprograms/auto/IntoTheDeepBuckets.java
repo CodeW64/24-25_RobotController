@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
 import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.hardware.CRServo;
 import com.qualcomm.robotcore.hardware.ColorRangeSensor;
@@ -13,6 +14,8 @@ import com.qualcomm.robotcore.hardware.TouchSensor;
 import org.firstinspires.ftc.teamcode.teamprograms.teleop.IntoTheDeepTeleop;
 
 @Autonomous(name = "The S.S. Steve's Primitive Net of Butter", group = "CWA")
+@Disabled
+@Deprecated
 public class IntoTheDeepBuckets extends LinearOpMode {
 
     // HARDWARE
