@@ -275,7 +275,10 @@ public final class MecanumDrive {
 
 
 //        localizer = new TwoDeadWheelLocalizer(hardwareMap, lazyImu.get(), PARAMS.inPerTick);
-        localizer = new GoBildaFullLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+
+        // FIXME: use localizer needed
+//        localizer = new GoBildaFullLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+        localizer = new RRGobildaLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
 
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);

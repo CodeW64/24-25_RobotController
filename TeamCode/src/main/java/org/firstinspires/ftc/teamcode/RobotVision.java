@@ -292,6 +292,11 @@ public class RobotVision {
     }
 
 
+    /**
+     * <strong>NOTE:</strong> <br>
+     * this method only works if the camera is mounted on the front of the robot and parallel with the drivetrain
+     * @param offsetDistance distance robot should stop in front of the AprilTag
+     */
     @Deprecated
     public void driveToAprilTag(double offsetDistance) {
         // in case anything slips through
@@ -348,8 +353,9 @@ public class RobotVision {
      * @param offsetDistance changes how far away robot will be from the AprilTag
      * @param offsetBearing changes drivetrain relation of pointing directly at the AprilTag
      * @param offsetYaw changes robot's offset from the center of the AprilTag
+     * @param cameraAngle angle camera is in relation to front of drivetrain
      */
-    public void driveToAprilTag(double offsetDistance, double offsetBearing, double offsetYaw) {
+    public void driveToAprilTag(double offsetDistance, double offsetBearing, double offsetYaw, double cameraAngle) {
         // in case anything slips through
         if (desiredTag == null) return;
 
@@ -372,11 +378,21 @@ public class RobotVision {
             y = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE); // strafe
         }
 
+        double driveHeading = Math.toRadians(cameraAngle);
+
+        double rotX = x * Math.cos(-driveHeading) - y * Math.sin(-driveHeading);
+        double rotY = x * Math.sin(-driveHeading) + y * Math.cos(-driveHeading);
+
+        double leftFrontPower    =  rotX -rotY -yaw;
+        double rightFrontPower   =  rotX +rotY +yaw;
+        double leftBackPower     =  rotX +rotY -yaw;
+        double rightBackPower    =  rotX -rotY +yaw;
+
         // Calculate wheel powers.
-        double leftFrontPower    =  x -y -yaw;
+        /*double leftFrontPower    =  x -y -yaw;
         double rightFrontPower   =  x +y +yaw;
         double leftBackPower     =  x +y -yaw;
-        double rightBackPower    =  x -y +yaw;
+        double rightBackPower    =  x -y +yaw;*/
 
         // Normalize wheel powers to be less than 1.0
         double max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
@@ -441,7 +457,7 @@ public class RobotVision {
         // Create the vision portal by using a builder.
         if (usingAprilTag || usingTensorflow) {
             VisionPortal.Builder builder = new VisionPortal.Builder();
-            builder.setCamera(hardwareMap.get(WebcamName.class, "glasses"));
+            builder.setCamera(hardwareMap.get(WebcamName.class, "eyeball"));
 
 //            if (usingTensorflow) builder.addProcessor(tfod);
             if (usingAprilTag) builder.addProcessor(aprilTag);

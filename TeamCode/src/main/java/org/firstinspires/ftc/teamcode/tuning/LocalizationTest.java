@@ -15,6 +15,7 @@ import org.firstinspires.ftc.teamcode.Drawing;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.TankDrive;
 import org.firstinspires.ftc.teamcode.TwoDeadWheelLocalizer;
+import org.firstinspires.ftc.teamcode.gobilda.GoBildaFullLocalizer;
 import org.firstinspires.ftc.teamcode.gobilda.RRGobildaLocalizer;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
@@ -35,10 +36,10 @@ public class LocalizationTest extends LinearOpMode {
             while (opModeIsActive()) {
                 drive.setDrivePowers(new PoseVelocity2d(
                         new Vector2d(
-                                -(gamepad1.left_stick_y),
-                                -(gamepad1.left_stick_x)
+                                -(gamepad1.left_stick_y*0.5),
+                                -(gamepad1.left_stick_x*0.5)
                         ),
-                        -(gamepad1.right_stick_x)
+                        -(gamepad1.right_stick_x*0.5)
                 ));
 
                 drive.updatePoseEstimate();
@@ -52,6 +53,15 @@ public class LocalizationTest extends LinearOpMode {
                 telemetry.addData("goBilda IMU direct velocity (RAD)", bildaVel.getHeading(AngleUnit.RADIANS));
                 if (drive.localizer instanceof RRGobildaLocalizer) {
                     telemetry.addData("goBilda IMU hasReturnedNaN", ((RRGobildaLocalizer) drive.localizer).hasReturnedNaN);
+                    telemetry.addData("RR X velocity", ((RRGobildaLocalizer) drive.localizer).par.getPositionAndVelocity().velocity);
+                    telemetry.addData("RR Y velocity", ((RRGobildaLocalizer) drive.localizer).perp.getPositionAndVelocity().velocity);
+                    telemetry.addData("goBilda X velocity", drive.bildaDriver.getVelX());
+                    telemetry.addData("goBilda Y velocity", drive.bildaDriver.getVelY());
+                }
+                if (drive.localizer instanceof GoBildaFullLocalizer) {
+                    telemetry.addData("goBilda IMU hasReturnedNAN", ((GoBildaFullLocalizer) drive.localizer).hasReturnedNaN);
+                    telemetry.addData("goBilda X velocity", drive.bildaDriver.getVelX());
+                    telemetry.addData("goBilda Y velocity", drive.bildaDriver.getVelY());
                 }
                 telemetry.addData("Drive Pose hasReturnedNaN", drive.hasReturnedNaN);
                 telemetry.addLine("--------------------------------");

@@ -26,7 +26,6 @@ import org.firstinspires.ftc.teamcode.messages.RRGoBildaInputsMessage;
  */
 
 @Config
-@Deprecated
 public final class RRGobildaLocalizer implements Localizer {
     public static class Params {
 
@@ -69,12 +68,12 @@ public final class RRGobildaLocalizer implements Localizer {
 
         this.bildaDriver = bildaDriver;
 
-        bildaDriver.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
+        this.bildaDriver.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD);
 
-        bildaDriver.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
+        this.bildaDriver.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
                 GoBildaPinpointDriver.EncoderDirection.FORWARD);
 
-        bildaDriver.recalibrateIMU(); // should let robot sit still for 0.25s
+        this.bildaDriver.recalibrateIMU(); // should let robot sit still for 0.25s
 
         this.inPerTick = inPerTick;
 

@@ -19,11 +19,13 @@ import org.firstinspires.ftc.teamcode.Localizer;
 import org.firstinspires.ftc.teamcode.messages.GoBildaFullInputsMessage;
 
 /*
+    IMPORTANT: LOCALIZER NOT FUNCTIONAL
     localizer fully abandons roadrunner's way of grabbing pose
     in favor of the goBILDA pinpoint odometry computer
  */
 
 @Config
+@Deprecated
 public final class GoBildaFullLocalizer implements Localizer {
     public static class Params {
 
@@ -40,6 +42,9 @@ public final class GoBildaFullLocalizer implements Localizer {
 
     public final GoBildaPinpointDriver bildaDriver; // this replaces the REV internal IMU and encoders
 
+    public boolean hasReturnedNaN = false;
+    private final float SWINGARM_RESOLUTION = 13.26291192f;
+
     private int lastParPos, lastPerpPos;
     private Rotation2d lastHeading;
 
@@ -53,12 +58,13 @@ public final class GoBildaFullLocalizer implements Localizer {
 
         this.bildaDriver = bildaDriver;
 
-        bildaDriver.setEncoderResolution(1.0); // so velocity outputs are raw
+        this.bildaDriver.setEncoderResolution(GoBildaPinpointDriver.GoBildaOdometryPods.goBILDA_SWINGARM_POD); // so velocity outputs are raw
+        // VELOCITY OUTPUTS IN THE 100s
 
-        bildaDriver.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
+        this.bildaDriver.setEncoderDirections(GoBildaPinpointDriver.EncoderDirection.FORWARD,
                 GoBildaPinpointDriver.EncoderDirection.FORWARD);
 
-        bildaDriver.resetPosAndIMU(); // should let robot sit still for 0.25s
+        this.bildaDriver.resetPosAndIMU(); // should let robot sit still for 0.25s
 
         this.inPerTick = inPerTick;
 
@@ -73,8 +79,8 @@ public final class GoBildaFullLocalizer implements Localizer {
         int bildaParXPos = bildaDriver.getEncoderX();
         int bildaPerpYPos = bildaDriver.getEncoderY();
         double bildaHeading = bildaDriver.getHeading();
-        double bildaParXVel = bildaDriver.getVelX();
-        double bildaPerpYVel = bildaDriver.getVelY();
+        double bildaParXVel = (int) bildaDriver.getVelX();
+        double bildaPerpYVel = (int) bildaDriver.getVelY();
         double bildaHeadingVel = bildaDriver.getHeadingVelocity();
 
         FlightRecorder.write("GOBILDA_FULL_INPUTS", new GoBildaFullInputsMessage(bildaParXPos,
@@ -116,6 +122,7 @@ public final class GoBildaFullLocalizer implements Localizer {
         double headingDelta = heading.minus(lastHeading);
 
         if (Double.isNaN(headingDelta) || Double.isNaN(headingVel)) {
+            hasReturnedNaN = true;
             return lastTwist;
         }
 
