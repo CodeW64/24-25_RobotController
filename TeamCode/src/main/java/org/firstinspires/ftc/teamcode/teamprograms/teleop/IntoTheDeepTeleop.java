@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 1.2.3 RELEASE
+ * Teleop Version: 1.3.2 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -140,19 +140,19 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     // PIVOT VARIABLES (editable by FTC dashboard)
     public static class PivotConstants {
         public double cushionRatio = 400;
-        public int resetLevelPos = 70; // 435 RPM = 70 | 312 RPM = 100
-        public int hangPos = 2700; // 435 RPM = 2700 | 312 RPM = 3700
-        public int attemptSamplePos = 50;
+        public int resetLevelPos = 100; // 435 RPM = 70 | 312 RPM = 100
+        public int hangPos = 3700; // 435 RPM = 2700 | 312 RPM = 3700
+        public int attemptSamplePos = 100; // 435 RPM = 50 | 312 RPM = 100
 
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
 
     // more pivot variables
-    final int PIVOT_MAX_POSITION = 2600; // 435 RPM = 2600 | 312 RPM = 3600
-    final int PIVOT_INTAKE_REST_POSITION = 300; // 435 RPM = 300 | 312 RPM = 400
+    final int PIVOT_MAX_POSITION = 3600; // 435 RPM = 2600 | 312 RPM = 3600
+    final int PIVOT_INTAKE_REST_POSITION = 400; // 435 RPM = 300 | 312 RPM = 400
     final int PIVOT_MIN_POSITION = 0;
-    final int PIVOT_DEPOSIT_POSITION = 2050; // 435 RPM = 2050 | 312 RPM = 2850
-    final int PIVOT_DEPOSIT_RETRACT_SET_POSITION = 2300; // 435 RPM = 2300 | 312 RPM = 3200
+    final int PIVOT_DEPOSIT_POSITION = 2850; // 435 RPM = 2050 | 312 RPM = 2850
+    final int PIVOT_DEPOSIT_RETRACT_SET_POSITION = 3200; // 435 RPM = 2300 | 312 RPM = 3200
 
 
 
@@ -263,7 +263,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 1.2.3 RELEASE");
+            telemetry.addLine("TELEOP VERSION 1.3.2 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
@@ -407,14 +407,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                         linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.9);
+                        lightTimer.reset();
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
+
+
                     // PIVOT
 
-                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10) {
+                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -468,16 +471,23 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.attemptSamplePos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         isArmPositionSet = false;
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED) && !isArmPositionSet) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
+                    }
+
+
                     // PIVOT
 
                     // move pivot down to 0 so it can grab a sample
-                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10) {
+                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -532,16 +542,23 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.attemptSamplePos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         isArmPositionSet = false;
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED) && !isArmPositionSet) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
+                    }
+
+
                     // PIVOT
 
                     // move pivot down to 0 so it can grab a sample
-                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10) {
+                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -592,13 +609,20 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                         linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED && !isArmPositionSet) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
+
+
                     // PIVOT
-                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10) {
+                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -681,11 +705,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
 
 
                     // EXIT
@@ -714,11 +744,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case INTAKE_RETRACT:
 
                     if (!isStateInitialized) {
+                        lightTimer.reset();
                         isStateInitialized = true;
                     }
 
                     if (!limitSwitch) {
-                        double timeAccel = Math.min((lightTimer.seconds()*2), 0.9);
+                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
                         linearSlideLift.setPower(-timeAccel);
                     } else {
                         linearSlideLift.setPower(0);
@@ -754,11 +785,19 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isIntakeProtected = true;
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
+
 
 
                     // stop slides once finished retracting
@@ -769,7 +808,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     } else if (!isArmPositionSet) {
-                        linearSlideLift.setPower(-1.0);
+                        linearSlideLift.setPower(-SLIDE_SPEED);
                     }
 
 
@@ -812,7 +851,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelL.setPower(INTAKE_POWER_HOLD);
                         linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.9);
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
@@ -877,10 +916,18 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
                         linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_RETRACT_SET_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
+
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
+
 
                     // EXIT
 
@@ -912,9 +959,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isStateInitialized = true;
                     }
+
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED)) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
+                    }
+
 
                     // EXIT
 
@@ -961,7 +1016,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     }
 
                     if (!limitSwitch) {
-                        double timeAccel = Math.min((lightTimer.seconds()*2), 0.9);
+                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
                         linearSlideLift.setPower((-timeAccel)+SLIDE_CONSTANTS.gravityCoefficient);
                     } else {
                         linearSlideLift.setPower(0);
@@ -994,9 +1049,16 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     if (!isStateInitialized) {
                         linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isArmPositionSet = false;
                         isStateInitialized = true;
+                    }
+
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED)) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
                     }
 
                     // stop slides once finished retracting
@@ -1007,7 +1069,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     } else if (!isArmPositionSet){
-                        linearSlideLift.setPower(-0.9);
+                        linearSlideLift.setPower(-SLIDE_SPEED);
                     }
 
                     // EXIT
@@ -1100,8 +1162,15 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelL.setPower(0);
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.hangPos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isStateInitialized = true;
+                    }
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
                     }
 
                     // EXIT
@@ -1196,7 +1265,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        linearSlidePivot.setPower(-0.2);
+                        linearSlidePivot.setPower(PIVOT_SPEED*(-0.2));
                         isStateInitialized = true;
                     }
 
@@ -1229,14 +1298,16 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlidePivot.setTargetPositionTolerance(3);
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.resetLevelPos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(0.5);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.5);
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
                     // in case slide did not have time to fully retract
-                    if (isLinearSlideFullyRetracted(limitSwitch)) {
+                    if (isLinearSlideFullyRetracted(limitSwitch) && !isArmPositionSet) {
                         linearSlideLift.setPower(0);
+                        linearSlideLift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     }
 
