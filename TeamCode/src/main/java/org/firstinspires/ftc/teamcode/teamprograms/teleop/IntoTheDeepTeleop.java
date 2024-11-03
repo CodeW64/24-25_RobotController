@@ -20,7 +20,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 1.3.2 RELEASE
+ * Teleop Version: 1.3.3 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -263,7 +263,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 1.3.2 RELEASE");
+            telemetry.addLine("TELEOP VERSION 1.3.3 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
@@ -349,9 +349,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 linearSlideState = LinearSlideStates.MANUAL_OVERRIDE;
             }
 
-            // enter PIVOT_RESET states
-            // NOTE: this is dangerous
-
+            // enter RESET_PIVOT states
+            // NOTE: this state can be dangerous
             if (gamepad1.dpad_right && !checkGOneDRIGHT &&
                 gamepad1.x && !checkGOneX &&
                 linearSlideState != LinearSlideStates.RESET_PIVOT_LOWER &&
@@ -499,7 +498,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     // SERVOS
                     // finish claw machine grab after a set amount of time
-                    if (isArmPositionSet && lightTimer.seconds() > 0.8) {
+                    if (isArmPositionSet && lightTimer.seconds() > 0.9) {
 
                         // robot has successfully acquired a sample
                         if (isPossessingSample(currentSampleDistance)) {
@@ -512,7 +511,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                             isStateInitialized = false;
                             linearSlideState = LinearSlideStates.INTAKE_EMPTY;
                         }
-                    } else if (isArmPositionSet && lightTimer.seconds() > 0.5) {
+                    } else if (isArmPositionSet && lightTimer.seconds() > 0.6) {
                         // bring intake up for a short period to secure sample
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                     }
@@ -1277,11 +1276,14 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     }
 
 
-                    // EXIT
+                    // EXIT/ABORT
 
-                    // leave once pivot hits the switch
+                    // leave once pivot hits the switch (or told to exit manually)
                     // reset encoder position so pivot knows where it is and go to level mode
-                    if (resetSwitch) {
+                    if (resetSwitch ||
+                            (gamepad1.dpad_right && !checkGOneDRIGHT && gamepad1.x && !checkGOneX)) {
+                        checkGOneDRIGHT = true;
+                        checkGOneX = true;
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
