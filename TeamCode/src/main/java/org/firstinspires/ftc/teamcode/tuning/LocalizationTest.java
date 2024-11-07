@@ -63,7 +63,6 @@ public class LocalizationTest extends LinearOpMode {
                     telemetry.addData("goBilda X velocity", drive.bildaDriver.getVelX());
                     telemetry.addData("goBilda Y velocity", drive.bildaDriver.getVelY());
                 }
-                telemetry.addData("Drive Pose hasReturnedNaN", drive.hasReturnedNaN);
                 telemetry.addLine("--------------------------------");
 
                 telemetry.addData("x", drive.pose.position.x);

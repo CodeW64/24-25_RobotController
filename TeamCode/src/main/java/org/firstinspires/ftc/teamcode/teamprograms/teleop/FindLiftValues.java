@@ -102,14 +102,17 @@ public class FindLiftValues extends LinearOpMode {
             } else if (gamepad2.dpad_right) {
                 intakeWheelR.setPower(SERVO_VALUES.intakePowerEmpty);
                 intakeWheelL.setPower(SERVO_VALUES.intakePowerEmpty);
-            }
-
-
-            if (gamepad2.y) {
-                sampleSensor.setGain(sampleSensor.getGain()+1);
             } else if (gamepad2.dpad_up) {
-                sampleSensor.setGain(sampleSensor.getGain()-1);
+                intakeWheelR.setPower(0);
+                intakeWheelL.setPower(0);
             }
+
+
+//            if (gamepad2.y) {
+//                sampleSensor.setGain(sampleSensor.getGain()+1);
+//            } else if (gamepad2.dpad_up) {
+//                sampleSensor.setGain(sampleSensor.getGain()-1);
+//            }
 
             telemetry.addData("distance CM", sampleSensor.getDistance(DistanceUnit.CM));
             telemetry.addData("Distance INCH", sampleSensor.getDistance(DistanceUnit.INCH));

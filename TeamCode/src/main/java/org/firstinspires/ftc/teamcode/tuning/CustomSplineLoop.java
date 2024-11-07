@@ -57,7 +57,6 @@ public class CustomSplineLoop extends LinearOpMode {
             if (drive.localizer instanceof RRGobildaLocalizer) {
                 telemetry.addData("goBilda IMU hasReturnedNaN", ((RRGobildaLocalizer) drive.localizer).hasReturnedNaN);
             }
-            telemetry.addData("Drive Pose hasReturnedNaN", drive.hasReturnedNaN);
             telemetry.addLine("-------------------------");
             telemetry.addLine("Path End Readings");
             telemetry.addData("X", drive.pose.position.x);
