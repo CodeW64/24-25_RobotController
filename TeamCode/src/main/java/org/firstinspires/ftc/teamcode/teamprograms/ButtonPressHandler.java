@@ -13,7 +13,8 @@ import java.util.function.Function;
  * 
  * <p>The {@code onPressFn} should be a lambda function with one paramater
  * 
- * @version 1.1.0
+ * @author Connor Larson
+ * @version 1.2.0
  */
 public class ButtonPressHandler {
     private String buttonName = null;
@@ -26,6 +27,8 @@ public class ButtonPressHandler {
      */
     private boolean hasActivatedFunction = false;
 
+    private Field buttonField;
+
     /**
      * Builds a new handler for the given gamepad, button name, and function to be
      * executed upon press of the button.
@@ -33,24 +36,92 @@ public class ButtonPressHandler {
      * @param gamepadToUse
      * @param buttonNameToCheck
      * @param onPressFn
-     * @throws NoSuchFieldException
-     * @throws NullPointerException
-     * @version 1.0.0
+     * @throws NoSuchFieldException The provided buttonName was not found in the gamepad class
      */
     public ButtonPressHandler(
         Gamepad gamepadToUse, 
         String buttonNameToCheck, 
         Consumer<Gamepad> onPressFn
-    ) throws NoSuchFieldException, NullPointerException {
+    ) throws NoSuchFieldException {
         // Checking arguments for validity
-        gamepadToUse.getClass().getField(buttonNameToCheck); // Ignore value, throws when not found or null
-        if(onPressFn == null) {
-            throw new NullPointerException("Attempted to access null \"onPressFn\" argument.");
-        }
-
+        buttonField = gamepadToUse.getClass().getField(buttonNameToCheck); // Throws when not found or null
         gamepad = gamepadToUse;
         buttonName = buttonNameToCheck;
         onPress = onPressFn;
+    }
+   
+    /**
+     * Builds a new handler for the given gamepad, button name, and function to be
+     * executed upon press of the button.
+     * 
+     * @param gamepadToUse
+     * @param buttonNameToCheck
+     * @param onPressFn
+     * @throws NoSuchFieldException The provided buttonName was not found in the gamepad class
+     */
+    public ButtonPressHandler(
+        Gamepad gamepadToUse, 
+        String buttonNameToCheck
+    ) throws NoSuchFieldException {
+        // Checking arguments for validity
+        buttonField = gamepadToUse.getClass().getField(buttonNameToCheck); // Throws when not found or null
+        gamepad = gamepadToUse;
+        buttonName = buttonNameToCheck;
+    }
+
+    /**
+     * Returns whether the onpress should be called. The return value of the 
+     * condition should be true if the button is currently being held and false 
+     * otherwise. Whether it has just been pressed is determined by this object.
+     * 
+     * @param condition Function{@literal <Field, Boolean>} - Takes the given 
+     * value of the button in the gamepad object and returns whether the button is
+     * being pressed or not.
+     * @return Boolean indicating whether, relative to last check, the button
+     *     has just beem pressed.
+     * @see isPressed()
+     */
+    public boolean isPressed(Function<Field, Boolean> condition) {
+        final boolean isButtonHeld = condition.apply(buttonField);
+        
+        // The button went from not held to actively held; it was pressed!
+        if(isButtonHeld && !hasActivatedFunction) {
+            hasActivatedFunction = true;
+            return true;
+        }
+
+        // The button is has been let go; set hasActivated to false
+        if(!hasActivatedFunction) {
+            hasActivatedFunction = false;
+        }
+
+        return false;
+    }
+
+    /**
+     * Returns whether the onpress should be called. This relies on the button 
+     * being a boolean value. If not, this will throw.
+     * 
+     * @return Boolean indicating whether, relative to last check, the button 
+     *     has just been pressed. 
+     * @throws IllegalAccessException
+     * @see isPressed(Function{@literal <Field, Boolean>})
+     */
+    public boolean isPressed() throws IllegalAccessException {
+        final boolean isButtonHeld = buttonField.getBoolean(gamepad);
+        
+        // The button went from not held to actively held; it was pressed!
+        if(isButtonHeld && !hasActivatedFunction) {
+            hasActivatedFunction = true;
+            return true;
+        }
+
+        // The button is has been let go; set hasActivated to false
+        if(!hasActivatedFunction) {
+            hasActivatedFunction = false;
+        }
+
+        return false;
     }
 
     /**
@@ -58,25 +129,12 @@ public class ButtonPressHandler {
      * The button should be a boolean value; otherwise, the method will throw 
      * an exception.
      * 
-     * @throws NoSuchFieldException
      * @throws IllegalAccessException
-     * @version 1.0.0
      * @see activateIfPressed(Function{@literal <Field, Boolean>})
      */
-    public void activateIfPressed() throws NoSuchFieldException, IllegalAccessException {
-        final boolean isPressingButton = gamepad
-            .getClass()
-            .getField(buttonName)
-            .getBoolean(gamepad);
-        
-        if(isPressingButton && !hasActivatedFunction) {
-            hasActivatedFunction = true;
+    public void activateIfPressed() throws IllegalAccessException {
+        if(isPressed() && onPress != null) {
             onPress.accept(gamepad);
-            return;
-        }
-        
-        if(!isPressingButton && hasActivatedFunction) {
-            hasActivatedFunction = false;
         }
     }
 
@@ -88,26 +146,16 @@ public class ButtonPressHandler {
      * @param condition Function{@literal <Field, Boolean>} - Takes the given 
      * value of the button in the gamepad object and returns whether the button is
      * being pressed or not.
-     * @throws NoSuchFieldException
-     * @version 1.0.0
      */
-    public void activateIfPressed(Function<Field, Boolean> condition) throws NoSuchFieldException {
-        final boolean isPressingButton = condition.apply(gamepad.getClass().getField(buttonName));
-        if(isPressingButton && !hasActivatedFunction) {
-            hasActivatedFunction = true;
+    public void activateIfPressed(Function<Field, Boolean> condition) {
+        if(isPressed(condition) && onPress != null) {
             onPress.accept(gamepad);
-            return;
-        }
-
-        if(!isPressingButton && hasActivatedFunction) {
-            hasActivatedFunction = false;
         }
     }
 
     /**
      * Returns the button name given in the constructor.
      * 
-     * @version 1.0.0
      */
     public String getButtonName() {
         return buttonName;
@@ -116,7 +164,6 @@ public class ButtonPressHandler {
     /**
      * Returns the gamepad given in the constructor.
      * 
-     * @version 1.0.0
      */
     public Gamepad getGamepad() {
         return gamepad;
@@ -125,7 +172,6 @@ public class ButtonPressHandler {
     /**
      * Returns the consumer lambda given in the constructor.
      * 
-     * @version 1.0.0
      */
     public Consumer<Gamepad> getOnPress() {
         return onPress;

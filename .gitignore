@@ -79,3 +79,7 @@ lint/generated/
 lint/outputs/
 lint/tmp/
 # lint/reports/
+
+# Other
+MeepMeepGui/
+MeepMeepGui/src/main/java/com/example/meepmeeptesting/MeepMeepTesting.java

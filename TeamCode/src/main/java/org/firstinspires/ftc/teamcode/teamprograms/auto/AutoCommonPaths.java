@@ -39,13 +39,17 @@ abstract public class AutoCommonPaths extends AprilLocater {
     public final static Pose2d BLUE_NET = new Pose2d(-52, 52, Math.toRadians(135)); 
     public final static Pose2d BLUE_OBSERVATION = new Pose2d(-60, 48, Math.toRadians(-135)); 
     public final static Pose2d BLUE_NEUTRAL_TAG = new Pose2d(-48, 72, Math.toRadians(90)); 
-    public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90)); 
+    public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90));
+    public final static Pose2d BLUE_BUCKETS_CHAMBER = new Pose2d(-36, 12, Math.toRadians(0));
+    public final static Pose2d BLUE_OBSERVATION_CHAMBER = new Pose2d(-36, -12, Math.toRadians(0)); 
 
     public final static Pose2d RED_SIDE_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_SIDE_TAG); 
     public final static Pose2d RED_NET = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NET); 
     public final static Pose2d RED_OBSERVATION = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_OBSERVATION); 
     public final static Pose2d RED_NEUTRAL_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NEUTRAL_TAG); 
     public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
+    public final static Pose2d RED_BUCKETS_CHAMBER = AutoCommonPaths.bluePoseToRed(BLUE_BUCKETS_CHAMBER);
+    public final static Pose2d RED_OBSERVATION_CHAMBER = AutoCommonPaths.bluePoseToRed(BLUE_OBSERVATION_CHAMBER); 
 
     public enum RotationType {
         LINEAR,
@@ -339,78 +343,30 @@ abstract public class AutoCommonPaths extends AprilLocater {
 
     /**
      * Moves the robot into a position to place a specimen on a chamber
+     */
+    protected void moveToCloseChamberInitial() {
+        lineTo(globalDrive, BLUE_BUCKETS_CHAMBER);
+    }
+    
+    /**
+     * Moves the robot into a position to place a specimen on a chamber
      * 
-     * @param tag AprilTagDetection - The detection of the nearest spike 
-     *     mark. 
      * @param distFrom double - The desired distance from the chamber
      */
-    protected void moveRobotInitalToChamber(AprilTagDetection tag, double distFrom) {
-        // Finding the distance directly away from the April Tag
-        /* Diagram of the distance:
-         *
-         *          \   Tag
-         *          /\   * 
-         *    curDis    /|    ___
-         *      /     / (|     |
-         *   \/     /    |  desiredDist
-         *    \   /_____[|    _|_
-         *      *        * 
-         *    Robot     Chamber
-         * 
-         * (The angle annotated with the paranthesis is the bearing)
-         * You can use cos(x) to find the desired dist. Note that the robot must 
-         * strafe farther because the April tag does not line up perfectly
-         */
-        final double curDist = tag.ftcPose.range;
-        final double bearing = tag.ftcPose.bearing;
-        final double desiredDist = curDist * Math.cos(bearing);
+    protected void moveToFarChamberInitial(double distFrom) {
+        lineTo(globalDrive, BLUE_OBSERVATION_CHAMBER);
+    }
 
-        // Getting the offset right from the April tag to the chambers
-        // Getting the offset right from the tag to the spike marks' centers
-        final double TILE_SIZE = 24; // In inches
-        double centerOffset = TILE_SIZE - distFrom; // inches
-
-        final boolean isNeutralMark = 
-            tag.id == AprilLocater.NEUTRAL_RED_ID || 
-            tag.id == AprilLocater.NEUTRAL_BLUE_ID;
-        if(!isNeutralMark) {
-            // If the tag is colored, then field setup means that the tag is to the left (-)
-            centerOffset *= -1;
-        }
-
-        // Getting the and going to it in a line
-        final Pose2d targetPoint = getPointAwayFromTag(tag, desiredDist, centerOffset);
-        final Pose2d destination = addPoses(targetPoint, destinationOffset);
-        final MecanumDrive mecDrive = new MecanumDrive(hardwareMap, new Pose2d(0, 0, 0));
-        
-        // Checking that the distance to travel is approz what it should be
-        final double ACTUAL_DIST = 2 * TILE_SIZE - 18;
-        final double TOLERANCE = 3; // inches
-        final double foundDist = Math.hypot(destination.position.x, destination.position.y);
-        if(Math.abs(foundDist - ACTUAL_DIST) > TOLERANCE) {
-            telemetry.addData("!!WARNING", String.format("Distance between the April dest and hypot is %d", foundDist));
-            // The destination seems very wrong; execute fallback path (moves forward);
-            telemetry.addData("Status", "executing fallback path to chambers");
-            telemetry.update();
-
-            Action fallbackLineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
-                // .setTangent(0)
-                .lineToX(ACTUAL_DIST)
-                .build();
-            return;
-        }
-        
-        // Executing the action!!
-        telemetry.addData("Status", "Executing action...");
-        telemetry.update();
-
-        Action lineToDestionation = mecDrive.actionBuilder(new Pose2d(0, 0, 0))
-            // .lineToLinearHeading(destination)
-            .setTangent(Math.atan2(destination.position.y, destination.position.x))
-            .lineToXLinearHeading(destination.position.x, destination.heading.toDouble())
-            .build();
-        Actions.runBlocking(lineToDestionation);
-        telemetry.addData("Status", "Finished action!");
+    /**
+     * Moves the robot forward the given distance
+     * 
+     * @param dist How far to move forward, in inches
+     */
+    protected void moveForward(double dist) {
+        final Vector2d pos = getCurrentPosition().position;
+        final double theta = getCurrentPosition().heading.toDouble();
+        final double newX = + dist * Math.cos(theta);
+        final double newY = + dist * Math.sin(theta);
         
     }
 
