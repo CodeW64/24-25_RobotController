@@ -40,16 +40,14 @@ abstract public class AutoCommonPaths extends AprilLocater {
     public final static Pose2d BLUE_OBSERVATION = new Pose2d(-60, 48, Math.toRadians(-135)); 
     public final static Pose2d BLUE_NEUTRAL_TAG = new Pose2d(-48, 72, Math.toRadians(90)); 
     public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90));
-    public final static Pose2d BLUE_BUCKETS_CHAMBER = new Pose2d(-36, 12, Math.toRadians(0));
-    public final static Pose2d BLUE_OBSERVATION_CHAMBER = new Pose2d(-36, -12, Math.toRadians(0)); 
+    public final static Pose2d BLUE_CHAMBER = new Pose2d(-24, 0, Math.toRadians(0));
 
     public final static Pose2d RED_SIDE_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_SIDE_TAG); 
     public final static Pose2d RED_NET = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NET); 
     public final static Pose2d RED_OBSERVATION = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_OBSERVATION); 
     public final static Pose2d RED_NEUTRAL_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_NEUTRAL_TAG); 
     public final static Pose2d RED_COLORED_TAG = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_COLORED_TAG); 
-    public final static Pose2d RED_BUCKETS_CHAMBER = AutoCommonPaths.bluePoseToRed(BLUE_BUCKETS_CHAMBER);
-    public final static Pose2d RED_OBSERVATION_CHAMBER = AutoCommonPaths.bluePoseToRed(BLUE_OBSERVATION_CHAMBER); 
+    public final static Pose2d RED_CHAMBER = AutoCommonPaths.bluePoseToRed(AutoCommonPaths.BLUE_CHAMBER);
 
     public enum RotationType {
         LINEAR,
@@ -342,19 +340,10 @@ abstract public class AutoCommonPaths extends AprilLocater {
     }
 
     /**
-     * Moves the robot into a position to place a specimen on a chamber
+     * Moves the robot into a position to place a specimen on a chamber.
      */
     protected void moveToCloseChamberInitial() {
-        lineTo(globalDrive, BLUE_BUCKETS_CHAMBER);
-    }
-    
-    /**
-     * Moves the robot into a position to place a specimen on a chamber
-     * 
-     * @param distFrom double - The desired distance from the chamber
-     */
-    protected void moveToFarChamberInitial(double distFrom) {
-        lineTo(globalDrive, BLUE_OBSERVATION_CHAMBER);
+        lineTo(globalDrive, BLUE_CHAMBER);
     }
 
     /**

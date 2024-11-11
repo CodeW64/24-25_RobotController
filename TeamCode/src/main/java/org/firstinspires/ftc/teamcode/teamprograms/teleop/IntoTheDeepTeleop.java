@@ -10,10 +10,8 @@ import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
-import com.qualcomm.robotcore.hardware.VoltageSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
-import org.firstinspires.ftc.robotcore.external.navigation.CurrentUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.FailedInitializationException;
 import org.firstinspires.ftc.teamcode.RobotVision;
@@ -142,7 +140,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         public double cushionRatio = 400;
         public int resetLevelPos = 90; // 435 RPM = 70 | 312 RPM = 100
         public int hangPos = 3700; // 435 RPM = 2700 | 312 RPM = 3700
-        public int attemptSamplePos = 100; // 435 RPM = 50 | 312 RPM = 100
+        public int attemptSamplePos = 70; // 435 RPM = 50 | 312 RPM = 100
 
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
@@ -183,6 +181,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     boolean tankDrive = true;
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
+    boolean camera = false; // disable if camera not in use or if it doesn't exist
 
     int manualPivotCheckpoint = 0;
 
@@ -894,8 +893,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
+                        intakeWheelR.setPower(INTAKE_POWER_HOLD);
+                        intakeWheelL.setPower(INTAKE_POWER_HOLD);
                         linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_RETRACT_SET_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(0);
@@ -991,8 +990,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
+//                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
+//                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
@@ -1660,21 +1659,23 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         intakeWheelL.setDirection(DcMotorSimple.Direction.REVERSE);
 
-        glasses = new RobotVision(hardwareMap, telemetry, true, false);
+        // normally enabled
+        if (camera) {
+            glasses = new RobotVision(hardwareMap, telemetry, true, false);
 
-        while (!isStopRequested() && !glasses.isCameraInitialized()) {
-            telemetry.addData("Camera", "Waiting");
-            telemetry.update();
+            while (!isStopRequested() && !glasses.isCameraInitialized()) {
+                telemetry.addData("Camera", "Waiting");
+                telemetry.update();
+            }
+
+            try {
+                glasses.setManualExposure(12, 200);
+            } catch (InterruptedException | FailedInitializationException e) {
+                telemetry.addLine("--------------------------------");
+                telemetry.addLine(e.getMessage());
+                telemetry.addLine("--------------------------------");
+            }
         }
-
-        try {
-            glasses.setManualExposure(12, 200);
-        } catch (InterruptedException | FailedInitializationException e) {
-            telemetry.addLine("--------------------------------");
-            telemetry.addLine(e.getMessage());
-            telemetry.addLine("--------------------------------");
-        }
-
 
     }
 

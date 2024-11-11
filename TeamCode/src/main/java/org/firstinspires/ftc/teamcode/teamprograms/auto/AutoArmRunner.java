@@ -17,7 +17,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 
 /**
  * Welcome!
- * Teleop Version: 0.6.0 BETA
+ * Teleop Version: A0.6.0 BETA (AUTO-EDIT)
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -70,19 +70,19 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  */
 
 @Config
-@Disabled
-@TeleOp(name="AutoArmRunner Test Suite")
+// @Disabled
+@TeleOp(name="AutoArmRunner Test Suite", group="teamprograms")
 public class AutoArmRunner extends LinearOpMode {
     protected boolean isTelemetrySuppresed = false;
 
     // HARDWARE
-    DcMotorEx frontRight, backRight, frontLeft, backLeft;
-    DcMotorEx linearSlideLift, linearSlidePivot;
-    CRServo intakeWheelR, intakeWheelL;
-    Servo intakePivot;
+    protected DcMotorEx frontRight, backRight, frontLeft, backLeft;
+    protected DcMotorEx linearSlideLift, linearSlidePivot;
+    protected CRServo intakeWheelR, intakeWheelL;
+    protected Servo intakePivot;
 
-    ColorRangeSensor sampleSensor;
-    TouchSensor linearSlideSwitch, pivotResetSwitch;
+    protected ColorRangeSensor sampleSensor;
+    protected TouchSensor linearSlideSwitch, pivotResetSwitch;
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
@@ -118,7 +118,7 @@ public class AutoArmRunner extends LinearOpMode {
         public double cushionRatio = 400;
         public double topBucketHeightAlternate = 4200;
         public double bottomBucketHeightAlternate = 2200;
-        public double depositEndRetract = 1800;
+        public double depositEndRetract = 1200;
         public double intakeEndRetract = 1200;
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
@@ -136,7 +136,7 @@ public class AutoArmRunner extends LinearOpMode {
     final int PIVOT_MIN_POSITION = 0;
     final int PIVOT_ALTERNATE_DEPOSIT_POSITION = 2850;
     final int PIVOT_ALTERNATE_RETRACT_SET_POSITION = 3200;
-
+    final int PIVOT_CHAMBER = 2300;
 
 
 
@@ -144,7 +144,7 @@ public class AutoArmRunner extends LinearOpMode {
     enum LinearSlideStates {
 
         INTAKE_ACTIVE, INTAKE_ATTEMPT_SAMPLE, INTAKE_DIVIDE_SAMPLE, INTAKE_FULL, INTAKE_EMPTY,
-        INTAKE_RETRACT_SET, INTAKE_RETRACT, INTAKE_EXTEND, PIVOT_TO_DEPOSIT,
+        INTAKE_RETRACT_SET, INTAKE_RETRACT, INTAKE_EXTEND, PIVOT_TO_DEPOSIT, PIVOT_TO_CHAMBER,
 
         DEPOSIT_ACTIVE, DEPOSIT_RETRACT_SET, DEPOSIT_RETRACT, PIVOT_TO_INTAKE,
         DEPOSIT_ALTERNATE_ACTIVE, DEPOSIT_ALTERNATE_RETRACT_SET, PIVOT_REVERSE_ALTERNATE,
@@ -160,9 +160,10 @@ public class AutoArmRunner extends LinearOpMode {
 
 
     // constant variables
-    final double SLIDE_SPEED = 1.0; // was 0.5
+    final double SLIDE_SPEED = 0.7; // was 0.5
     final double PIVOT_SPEED = 1.0;
-    final int PIVOT_TOLERANCE = 10; // How far the pivot can be from its position before stopping
+    final int PIVOT_TOLERANCE = 33; // How far the pivot can be from its position before stopping
+    private double pivotReverseFactor = 1; // Set AutoInit.driveMotorToIterative
 
     boolean tankDrive = true;
 
@@ -246,7 +247,7 @@ public class AutoArmRunner extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 0.6.0 BETA");
+            telemetry.addLine("TELEOP VERSION A0.6.0 BETA (AUTO EDIT)");
             telemetry.addLine("-------------------------");
 //            telemetry.addData("COLOR SENSOR OVERRIDDEN", overrideSampleSensor);
             telemetry.addData("TANK DRIVE", tankDrive);
@@ -410,7 +411,12 @@ public class AutoArmRunner extends LinearOpMode {
                     // EXIT INTAKE
 
                     // start sequence to pivot to deposit (ALTERNATE)
-                    if (isArmPositionSet && gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                    if(isArmPositionSet && gamepad2.dpad_left && gamepad2.left_trigger > 0.1) {
+                        checkGTwoLT = true;
+                        isStateInitialized = false;
+                        linearSlidePivot.setPower(0);
+                        linearSlideState = LinearSlideStates.PIVOT_TO_CHAMBER;
+                    } else if (isArmPositionSet && gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
                         linearSlideLift.setPower(0);
                         isStateInitialized = false;
@@ -433,6 +439,57 @@ public class AutoArmRunner extends LinearOpMode {
 
             // robot attempts to grab a sample
             // intake cannot be messed with while in this mode
+                case PIVOT_TO_CHAMBER:
+
+                    if (!isStateInitialized) {
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+
+                        // Driving the pivot the the target with the given power and tolerance
+                        linearSlidePivot.setTargetPosition(PIVOT_CHAMBER); // Used only to interface with older code
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isIntakeProtected = true;
+                        // isArmPositionSet = false;
+                        isArmPositionSet = true;
+                        isStateInitialized = true;
+                    }
+
+                    // linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    linearSlidePower = calculateSlidePower(linearSlidePosition, false);
+                    linearSlideLift.setPower(linearSlidePower);
+
+                    // EXIT
+
+                    // make deposit accessible once lift has finished pivoting
+                    // (and once slide has finished retracting)
+                    if (Math.abs(pivotPosition-linearSlidePivot.getTargetPosition()) < PIVOT_TOLERANCE &&
+                        isArmPositionSet) {
+                        linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isStateInitialized = false;
+                        pivotReverseFactor = 1; // Reset the factor 
+                        linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE;
+                    } else {
+                        pivotReverseFactor *= AutoInit.driveMotorToIterative(
+                            linearSlidePivot, 
+                            linearSlidePivot.getTargetPosition(), 
+                            PIVOT_TOLERANCE, 
+                            pivotReverseFactor * PIVOT_SPEED
+                        );
+                    }
+
+                    // ABORT
+
+                    // go back to intake if mistaken
+                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                        checkGTwoLT = true;
+                        linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
+                    }
+                    break;
+
+            // lift in position to score samples (OLD)
                 case INTAKE_ATTEMPT_SAMPLE:
 
                     if (!isStateInitialized) {
@@ -699,7 +756,7 @@ public class AutoArmRunner extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-                    if (!limitSwitch) {
+                    if (!limitSwitch && linearSlidePosition > SLIDE_CONSTANTS.intakeEndRetract) {
                         linearSlideLift.setPower(-1.0);
                     } else {
                         linearSlideLift.setPower(0);
@@ -710,7 +767,7 @@ public class AutoArmRunner extends LinearOpMode {
                     // start exiting right before slide hits 0
                     // (attempts to make transition faster and smoother)
                     if (
-                        linearSlidePosition < SLIDE_CONSTANTS.intakeEndRetract 
+                        linearSlidePosition <= SLIDE_CONSTANTS.intakeEndRetract 
                         || isLinearSlideFullyRetracted(limitSwitch)
                     ) {
                         isStateInitialized = false;
@@ -749,19 +806,14 @@ public class AutoArmRunner extends LinearOpMode {
                         if (alternateDeposit) {
                             target = PIVOT_ALTERNATE_DEPOSIT_POSITION;
                         } else {
-                            target = PIVOT_MAX_POSITION;
+                            target = PIVOT_ALTERNATE_DEPOSIT_POSITION;
+                            // target = PIVOT_DEPOSIT_POSITION;
                         }
 
                         
                         // Driving the pivot the the target with the given power and tolerance
                         linearSlidePivot.setTargetPosition(target); // Used only to interface with older code
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        AutoInit.driveMotorToIterative(
-                            linearSlidePivot, 
-                            target, 
-                            PIVOT_TOLERANCE, 
-                            PIVOT_SPEED
-                        );
                         isIntakeProtected = true;
                         // isArmPositionSet = false;
                         isArmPositionSet = true;
@@ -769,7 +821,7 @@ public class AutoArmRunner extends LinearOpMode {
                     }
 
                     // linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    linearSlidePower = calculateSlidePower(linearSlidePosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlidePosition, false);
                     linearSlideLift.setPower(linearSlidePower);
 
 
@@ -794,12 +846,20 @@ public class AutoArmRunner extends LinearOpMode {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
+                        pivotReverseFactor = 1; // Reset the factor 
 
                         if (alternateDeposit) {
                             linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE;
                         } else {
                             linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
                         }
+                    } else {
+                        pivotReverseFactor *= AutoInit.driveMotorToIterative(
+                            linearSlidePivot, 
+                            linearSlidePivot.getTargetPosition(), 
+                            PIVOT_TOLERANCE, 
+                            pivotReverseFactor * PIVOT_SPEED
+                        );
                     }
 
                     // ABORT
@@ -883,7 +943,7 @@ public class AutoArmRunner extends LinearOpMode {
                     // EXIT
 
                     // retract slides when pivot has been set
-                    if (lightTimer.seconds() > 0.5) {
+                    if (lightTimer.seconds() > 0) {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
                     }
@@ -942,7 +1002,8 @@ public class AutoArmRunner extends LinearOpMode {
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
+                        // linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
+                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
                     }
 
                     if (gamepad2.dpad_up && !checkGTwoDUP) {
@@ -1039,7 +1100,7 @@ public class AutoArmRunner extends LinearOpMode {
 
                     // TODO: eventually make slides slowly accelerate down
 
-                    if (!limitSwitch) {
+                    if (!limitSwitch && linearSlidePosition > SLIDE_CONSTANTS.depositEndRetract) {
                         linearSlideLift.setPower(-0.9);
                     } else {
                         linearSlideLift.setPower(0);
@@ -1049,7 +1110,7 @@ public class AutoArmRunner extends LinearOpMode {
                     // exit mode if slide has gone far enough to safely start pivoting
                     // NOTE: The value here may not matter as there is a check again in PIVOT_TO_DEPOSIT
                     if (
-                        linearSlidePosition < SLIDE_CONSTANTS.depositEndRetract 
+                        linearSlidePosition <= SLIDE_CONSTANTS.depositEndRetract 
                         || isLinearSlideFullyRetracted(limitSwitch)
                     ) {
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
@@ -1080,17 +1141,10 @@ public class AutoArmRunner extends LinearOpMode {
                         // linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION);
                         // linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         // linearSlidePivot.setPower(-PIVOT_SPEED);
-
-                        // LARSON EDIT: Made the code manually go to position to reduce RUN_TO_POSITION delays
+                        // isArmPositionSet = false;
                         linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION); // Used only to interface with older code
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        AutoInit.driveMotorToIterative(
-                            linearSlidePivot, 
-                            PIVOT_INTAKE_RETRACT_POSITION, 
-                            PIVOT_TOLERANCE, 
-                            -PIVOT_SPEED
-                        );
-                        isArmPositionSet = false;
+                        isArmPositionSet = true;
                         isStateInitialized = true;
                     }
 
@@ -1105,6 +1159,9 @@ public class AutoArmRunner extends LinearOpMode {
                         linearSlideLift.setPower(-0.9);
                     }
 
+                    linearSlidePower = calculateSlidePower(linearSlidePosition, false);
+                    linearSlideLift.setPower(linearSlidePower);
+
                     // EXIT
 
                     // make intake accessible once lift has finished pivoting
@@ -1114,6 +1171,7 @@ public class AutoArmRunner extends LinearOpMode {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
+                        pivotReverseFactor = 1; // Reset the direction and speed of pivot
 
                         // for in case deposit pivot was canceled
                         if (isPossessingSample(currentSampleDistance)) {
@@ -1121,6 +1179,13 @@ public class AutoArmRunner extends LinearOpMode {
                         } else {
                             linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
                         }
+                    } else {
+                        pivotReverseFactor *= AutoInit.driveMotorToIterative(
+                            linearSlidePivot, 
+                            PIVOT_INTAKE_RETRACT_POSITION, 
+                            PIVOT_TOLERANCE, 
+                            -pivotReverseFactor * PIVOT_SPEED
+                        );
                     }
 
                     // ABORT
@@ -1139,6 +1204,7 @@ public class AutoArmRunner extends LinearOpMode {
                             linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
                         }
                     }
+                    
                     break;
 
             // allows slides to pivot manually (can enter from DEPOSIT_ACTIVE)
@@ -1448,56 +1514,17 @@ public class AutoArmRunner extends LinearOpMode {
                     break;
             }
 
-
-
-
-// DRIVETRAIN ------------------------------------------------------------------------------------
-
-            // TODO: add april tag runner?
-
-
-            // set drive speed
-            if (gamepad1.right_bumper && !checkGOneRB && driveSpeedIndex < driveSpeedRange.length-1) {
-                driveSpeedIndex++;
-                driveSpeedFactor = driveSpeedRange[driveSpeedIndex];
-                checkGOneRB = true;
-
-            } else if (gamepad1.left_bumper && !checkGOneLB && driveSpeedIndex > 0) {
-                driveSpeedIndex--;
-                driveSpeedFactor = driveSpeedRange[driveSpeedIndex];
-                checkGOneLB = true;
-            }
-
-            // assign power and set power
-            if (tankDrive) {
-                // tank mecanum drive
-
-                rightPower = -gamepad1.right_stick_y * driveSpeedFactor;
-                leftPower = -gamepad1.left_stick_y * driveSpeedFactor;
-
-                slideToRight = -gamepad1.right_trigger * driveSpeedFactor * 1.1;
-                slideToLeft = -gamepad1.left_trigger * driveSpeedFactor * 1.1;
-
-                double tankDenominator = Math.max(Math.abs((rightPower+leftPower)/2) + Math.abs(slideToRight) + Math.abs(slideToLeft), 1);
-
-                frontRight.setPower((rightPower + slideToRight - slideToLeft) / tankDenominator);
-                backRight.setPower((rightPower - slideToRight + slideToLeft) / tankDenominator);
-                frontLeft.setPower((leftPower - slideToRight + slideToLeft)/ tankDenominator);
-                backLeft.setPower((leftPower + slideToRight - slideToLeft)/ tankDenominator);
-
-            } else {
-                // standard mecanum drive
-
-                powerX = gamepad1.left_stick_x * 1.1;
-                powerY = -gamepad1.left_stick_y;
-                powerRX = gamepad1.right_stick_x;
-
-                double mecanumDenominator = Math.max(Math.abs(powerX) + Math.abs(powerY) + Math.abs(powerRX), 1);
-
-                frontRight.setPower(((powerY - powerX - powerRX) / mecanumDenominator)*driveSpeedFactor);
-                backRight.setPower(((powerY + powerX - powerRX) / mecanumDenominator)*driveSpeedFactor);
-                frontLeft.setPower(((powerY + powerX + powerRX) / mecanumDenominator)*driveSpeedFactor);
-                backLeft.setPower(((powerY - powerX + powerRX) / mecanumDenominator)*driveSpeedFactor);
+            
+            // END IT ALL
+            // Put the pivot at 0 and end the teleop
+            if(gamepad1.dpad_left && gamepad2.dpad_left) {
+                AutoInit.driveMotorTo(
+                    linearSlidePivot, 
+                    PIVOT_MIN_POSITION, 
+                    3, 
+                    -0.5
+                );
+                requestOpModeStop();
             }
 
 
@@ -1630,17 +1657,17 @@ public class AutoArmRunner extends LinearOpMode {
         double pivotCushion = 1;
 
         // find pivot cushion so it does not bend the robot in half
-        if ((-gamepad2.left_stick_y) > 0) {
-            // for moving pivot up
-            // END POSITION MAX
-            pivotCushion = ((double)PIVOT_MAX_POSITION - pivotPosition)/PIVOT_CONSTANTS.cushionRatio;
+        // if ((-gamepad2.left_stick_y) > 0) {
+        //     // for moving pivot up
+        //     // END POSITION MAX
+        //     pivotCushion = ((double)PIVOT_MAX_POSITION - pivotPosition)/PIVOT_CONSTANTS.cushionRatio;
 
-        } else {
-            // for moving pivot down
-            // END POSITION 0
-            pivotCushion = (pivotPosition - (double)PIVOT_MIN_POSITION)/PIVOT_CONSTANTS.cushionRatio;
+        // } else {
+        //     // for moving pivot down
+        //     // END POSITION 0
+        //     pivotCushion = (pivotPosition - (double)PIVOT_MIN_POSITION)/PIVOT_CONSTANTS.cushionRatio;
 
-        }
+        // }
 
         // set power
         pivotPower = (-gamepad2.left_stick_y)*PIVOT_SPEED*pivotCushion;

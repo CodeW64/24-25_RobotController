@@ -230,8 +230,12 @@ abstract public class AutoInit extends AutoArmRunner {
      *     extend, negative retract.
      */
     public static void driveMotorTo(DcMotor motor, int tickTarget, int tolerance, double power) {
+        double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
         while(Math.abs(motor.getCurrentPosition() - tickTarget) > tolerance) {
-            motor.setPower(power);
+            if((tickTarget - motor.getCurrentPosition()) / (reverseFactor * power) < 0) {
+                reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed 
+            }
+            motor.setPower(reverseFactor * power);
         }
         motor.setPower(0); // Stop the motor from continuing
     }
@@ -252,13 +256,24 @@ abstract public class AutoInit extends AutoArmRunner {
      *     size of the allowed range is equal to 2 * tolerance. 
      * @param power How powerful the motor should be run. Positive values 
      *     extend, negative retract.
+     * @param reverseFactor A value that is meant to be multiplied by the power
+     *     argument in the next call.
      */
-    public static void driveMotorToIterative(DcMotor motor, int tickTarget, int tolerance, double power) {
+    public static double driveMotorToIterative(DcMotor motor, int tickTarget, int tolerance, double power) {
+        double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
         if(Math.abs(motor.getCurrentPosition() - tickTarget) > tolerance) {
-            motor.setPower(power);
+            // Revsering the speed if the target was missed.
+            if((tickTarget - motor.getCurrentPosition()) / (reverseFactor * power) < 0) {
+                reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed
+            }
+
+            // Setting the power
+            motor.setPower(reverseFactor * power);
         } else {
             motor.setPower(0);
         }
+
+        return reverseFactor;
     }
 
     /**
