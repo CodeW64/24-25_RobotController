@@ -67,7 +67,7 @@ public class RobotVision {
     public static class AutoGains {
         public double driving = 0.035;
         public double strafe = 0.025;
-        public double turning = 0.03; // 0.025
+        public double turning = 0.04; // 0.025
     }
     public static AutoGains AUTO_GAINS = new AutoGains();
 

@@ -90,7 +90,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.44;
+        public double pivotIntakePos = 0.42;
         public double pivotEjectSamplePos = 0.85;
         public double pivotDepositPos = 0.34;
         public double pivotRestPos = 0.52;
@@ -122,7 +122,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         public double glassesDistance = 11; // inches
         public double glassesBearing = 7; // degrees
         public double glassesYaw = 5; // degrees
-        public double glassesCameraAngle = 50; // degrees
+        public double glassesCameraAngle = 60; // degrees
     }
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
 
