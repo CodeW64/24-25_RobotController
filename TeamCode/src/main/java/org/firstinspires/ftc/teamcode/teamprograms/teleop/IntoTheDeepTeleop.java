@@ -119,10 +119,10 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         public float sampleSensorGain = 1.0f;
         public double sampleDistance = 3.2;
         public double sampleCodeBlue = 0.007;
-        public double glassesDistance = 12; // inches
-        public double glassesBearing = 0; // degrees
-        public double glassesYaw = 0; // degrees
-        public double glassesCameraAngle = 45; // degrees
+        public double glassesDistance = 11; // inches
+        public double glassesBearing = 7; // degrees
+        public double glassesYaw = 5; // degrees
+        public double glassesCameraAngle = 50; // degrees
     }
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
 
@@ -183,7 +183,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     boolean tankDrive = true;
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
-    boolean camera = false; // disable if camera not in use or if it doesn't exist
+    boolean camera = true; // disable if camera not in use or if it doesn't exist
 
     int manualPivotCheckpoint = 0; // used for manual lowering/raising of slide pivot for reset
     int adjustedPivotHangPos = PIVOT_CONSTANTS.hangPos; // used if robot can't reach bar
@@ -1555,6 +1555,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
             telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
             telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+            telemetry.addLine("-------------------------");
+
+            if (glasses.hasAprilTag()) {
+                telemetry.addLine("VISION");
+                glasses.addAprilTagTelemetry();
+            }
 
             telemetry.update();
 
@@ -1706,18 +1712,18 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         if (camera) {
             glasses = new RobotVision(hardwareMap, telemetry, true, false);
 
-            while (!isStopRequested() && !glasses.isCameraInitialized()) {
-                telemetry.addData("Camera", "Waiting");
-                telemetry.update();
-            }
-
-            try {
-                glasses.setManualExposure(12, 200);
-            } catch (InterruptedException | FailedInitializationException e) {
-                telemetry.addLine("--------------------------------");
-                telemetry.addLine(e.getMessage());
-                telemetry.addLine("--------------------------------");
-            }
+//            while (!isStopRequested() && !glasses.isCameraInitialized()) {
+//                telemetry.addData("Camera", "Waiting");
+//                telemetry.update();
+//            }
+//
+//            try {
+//                glasses.setManualExposure(12, 200);
+//            } catch (InterruptedException | FailedInitializationException e) {
+//                telemetry.addLine("--------------------------------");
+//                telemetry.addLine(e.getMessage());
+//                telemetry.addLine("--------------------------------");
+//            }
         }
 
     }
