@@ -93,7 +93,7 @@ public class CustomConceptAprilTag extends LinearOpMode {
 
         initAprilTag();
 
-        setManualExposure(6, 200);  // Use low exposure time to reduce motion blur
+//        setManualExposure(24, 1000);  // Use low exposure time to reduce motion blur
 
         // Wait for the DS start button to be touched.
         telemetry.addData("DS preview on/off", "3 dots, Camera Stream");
@@ -139,7 +139,7 @@ public class CustomConceptAprilTag extends LinearOpMode {
             .setDrawCubeProjection(false)
             .setDrawTagOutline(true)
             .setTagFamily(AprilTagProcessor.TagFamily.TAG_36h11)
-            .setTagLibrary(AprilTagGameDatabase.getCenterStageTagLibrary())
+            .setTagLibrary(AprilTagGameDatabase.getIntoTheDeepTagLibrary())
             .setOutputUnits(DistanceUnit.INCH, AngleUnit.DEGREES)
 
             // == CAMERA CALIBRATION ==

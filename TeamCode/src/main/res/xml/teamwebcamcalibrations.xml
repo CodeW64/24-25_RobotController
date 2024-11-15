@@ -157,8 +157,8 @@
     </Camera> -->
 
     <!-- ======================================================================================= -->
-    
-    goBILDA SKU: 3122-0003-0001, Calibrated by Ethan Doak, 2024.10.08 using 3DF Zephyr
+
+     goBILDA SKU: 3122-0003-0001, Calibrated by Ethan Doak, 2024.10.08 using 3DF Zephyr
     <Camera vid="0xBDA" pid="0x5805">
         <Calibration
             size="1920, 1080"
@@ -191,6 +191,5 @@
     </Camera>
 
     <!-- ======================================================================================= -->
-
 
 </Calibrations>

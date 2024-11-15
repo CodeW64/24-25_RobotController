@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode;
 
 import androidx.annotation.NonNull;
 
+import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -23,6 +24,15 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
 
+/**
+ * R.I.P. Tensorflow. You shall be most dearly missed in the Autonomous. <br> <br>
+ * <strong>A Haiku dedicated to the memory of Tensorflow, written by ChatGPT</strong> <br>
+ * Farewell, TensorFlow, <br>
+ * Silent pixels pause their gaze, <br>
+ * April Tags now lead. <br>
+ */
+
+@Config
 public class RobotVision {
 
 
@@ -44,7 +54,6 @@ public class RobotVision {
     }*/
 
 
-    // TODO: change for next season to match Tensorflow model
     /*private static final String TFOD_MODEL_ASSET = "CenterstageMeetTwo.tflite";
     private static final String[] LABELS = {
             "TeamPropBlue",
@@ -54,29 +63,42 @@ public class RobotVision {
     private final String[] pathValues = {"Left", "Center", "Right"};
 
 
+    // Gains for driving to an April Tag (editable by FTC dashboard)
+    public static class AutoGains {
+        public double driving = 0.035;
+        public double strafe = 0.025;
+        public double turning = 0.04; // 0.025
+    }
+    public static AutoGains AUTO_GAINS = new AutoGains();
+
+
+    // Speed caps for driving to an April Tag (editable by FTC dashboard)
+    public static class AutoSpeeds {
+        public double maxDriving = 0.4;
+        public double maxStrafe = 0.3;
+        public double maxTurning = 0.5;
+
+        public double correctionDriving = 0.2;
+        public double correctionStrafe = 0.2;
+        public double correctionTurning = 0.3;
+    }
+    public static AutoSpeeds AUTO_SPEEDS = new AutoSpeeds();
 
 
 
-//    final double DESIRED_DISTANCE = 12.0; //  this is how close the camera should get to the target (inches)
+
+    // REFERENCE
 
     //  Set the GAIN constants to control the relationship between the measured position error, and how much power is
     //  applied to the drive motors to correct the error.
     //  Drive = Error * Gain    Make these values smaller for smoother control, or larger for a more aggressive response.
-    final double SPEED_GAIN  =  0.035  ;   //  Forward Speed Control "Gain". eg: Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0) | ORIGINAL 0.02
-    final double STRAFE_GAIN =  0.025 ;   //  Strafe Speed Control "Gain".  eg: Ramp up to 25% power at a 25 degree Yaw error.   (0.25 / 25.0) | ORIGINAL 0.015
-    final double TURN_GAIN   =  0.03  ;   //  Turn Control "Gain".  eg: Ramp up to 25% power at a 25 degree error. (0.25 / 25.0) | ORIGINAL 0.01
 
-    final double MAX_AUTO_SPEED = 0.4;
-    final double MAX_AUTO_STRAFE= 0.3;
-    final double MAX_AUTO_TURN  = 0.4;
-
-    final double CORRECTION_AUTO_SPEED = 0.2;
-    final double CORRECTION_AUTO_STRAFE = 0.2;
-    final double CORRECTION_AUTO_TURN = 0.2;
+    //  Forward Speed Control "Gain". eg: Ramp up to 50% power at a 25 inch error.   (0.50 / 25.0) | ORIGINAL 0.02
+    //  Strafe Speed Control "Gain".  eg: Ramp up to 25% power at a 25 degree Yaw error.   (0.25 / 25.0) | ORIGINAL 0.015
+    //  Turn Control "Gain".  eg: Ramp up to 25% power at a 25 degree error. (0.25 / 25.0) | ORIGINAL 0.01
 
     private final DcMotor leftFrontDrive, rightFrontDrive, leftBackDrive, rightBackDrive;
 
-//    private static final int DESIRED_TAG_ID = 8;     // Choose the tag you want to approach or set to -1 for ANY tag.
     private VisionPortal visionPortal;               // Used to manage the video source.
     private AprilTagProcessor aprilTag;              // Used for managing the AprilTag detection process.
     private AprilTagDetection desiredTag;
@@ -291,6 +313,20 @@ public class RobotVision {
         return desiredTag;
     }
 
+    /**
+     * @return if robot has an April Tag in its sight
+     */
+    public boolean hasAprilTag() {
+        return desiredTag != null;
+    }
+
+    public void addAprilTagTelemetry() {
+        telemetry.addData("April Tag ID", desiredTag.id);
+        telemetry.addData("Distance", desiredTag.ftcPose.range);
+        telemetry.addData("Bearing", desiredTag.ftcPose.bearing);
+        telemetry.addData("Yaw", desiredTag.ftcPose.yaw);
+    }
+
 
     /**
      * <strong>NOTE:</strong> <br>
@@ -312,13 +348,13 @@ public class RobotVision {
 
         // Use the speed and turn "gains" to calculate how we want the robot to move.
         if (Math.abs(rangeError) < 2) {
-            x  = Range.clip(rangeError * SPEED_GAIN, -CORRECTION_AUTO_SPEED, CORRECTION_AUTO_SPEED); // drive
-            yaw   = Range.clip(headingError * TURN_GAIN, -CORRECTION_AUTO_TURN, CORRECTION_AUTO_TURN) ; // turn
-            y = Range.clip(-yawError * STRAFE_GAIN, -CORRECTION_AUTO_STRAFE, CORRECTION_AUTO_STRAFE); // strafe
+            x  = Range.clip(rangeError * AUTO_GAINS.driving, -AUTO_SPEEDS.correctionDriving, AUTO_SPEEDS.correctionDriving); // drive
+            yaw   = Range.clip(headingError * AUTO_GAINS.turning, -AUTO_SPEEDS.correctionTurning, AUTO_SPEEDS.correctionTurning) ; // turn
+            y = Range.clip(-yawError * AUTO_GAINS.strafe, -AUTO_SPEEDS.correctionStrafe, AUTO_SPEEDS.correctionStrafe); // strafe
         } else {
-            x  = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED); // drive
-            yaw   = Range.clip(headingError * TURN_GAIN, -MAX_AUTO_TURN, MAX_AUTO_TURN) ; // turn
-            y = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE); // strafe
+            x  = Range.clip(rangeError * AUTO_GAINS.driving, -AUTO_SPEEDS.maxDriving, AUTO_SPEEDS.maxDriving); // drive
+            yaw   = Range.clip(headingError * AUTO_GAINS.turning, -AUTO_SPEEDS.maxTurning, AUTO_SPEEDS.maxTurning) ; // turn
+            y = Range.clip(-yawError * AUTO_GAINS.strafe, -AUTO_SPEEDS.maxStrafe, AUTO_SPEEDS.maxStrafe); // strafe
         }
 
         // Calculate wheel powers.
@@ -369,13 +405,13 @@ public class RobotVision {
 
         // Use the speed and turn "gains" to calculate how we want the robot to move.
         if (Math.abs(rangeError) < 2) {
-            x  = Range.clip(rangeError * SPEED_GAIN, -CORRECTION_AUTO_SPEED, CORRECTION_AUTO_SPEED); // drive
-            yaw   = Range.clip(headingError * TURN_GAIN, -CORRECTION_AUTO_TURN, CORRECTION_AUTO_TURN) ; // turn
-            y = Range.clip(-yawError * STRAFE_GAIN, -CORRECTION_AUTO_STRAFE, CORRECTION_AUTO_STRAFE); // strafe
+            x  = Range.clip(rangeError * AUTO_GAINS.driving, -AUTO_SPEEDS.correctionDriving, AUTO_SPEEDS.correctionDriving); // drive
+            yaw   = Range.clip(headingError * AUTO_GAINS.turning, -AUTO_SPEEDS.correctionTurning, AUTO_SPEEDS.correctionTurning) ; // turn
+            y = Range.clip(-yawError * AUTO_GAINS.strafe, -AUTO_SPEEDS.correctionStrafe, AUTO_SPEEDS.correctionStrafe); // strafe
         } else {
-            x  = Range.clip(rangeError * SPEED_GAIN, -MAX_AUTO_SPEED, MAX_AUTO_SPEED); // drive
-            yaw   = Range.clip(headingError * TURN_GAIN, -MAX_AUTO_TURN, MAX_AUTO_TURN) ; // turn
-            y = Range.clip(-yawError * STRAFE_GAIN, -MAX_AUTO_STRAFE, MAX_AUTO_STRAFE); // strafe
+            x  = Range.clip(rangeError * AUTO_GAINS.driving, -AUTO_SPEEDS.maxDriving, AUTO_SPEEDS.maxDriving); // drive
+            yaw   = Range.clip(headingError * AUTO_GAINS.turning, -AUTO_SPEEDS.maxTurning, AUTO_SPEEDS.maxTurning) ; // turn
+            y = Range.clip(-yawError * AUTO_GAINS.strafe, -AUTO_SPEEDS.maxStrafe, AUTO_SPEEDS.maxStrafe); // strafe
         }
 
         double driveHeading = Math.toRadians(cameraAngle);
