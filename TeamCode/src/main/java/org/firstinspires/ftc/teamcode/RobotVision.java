@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
  * <strong>A Haiku dedicated to the memory of Tensorflow, written by ChatGPT</strong> <br>
  * Farewell, TensorFlow, <br>
  * Silent pixels pause their gaze, <br>
- * April tags now lead. <br>
+ * April Tags now lead. <br>
  */
 
 @Config
