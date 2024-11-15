@@ -29,7 +29,9 @@ import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
+// import com.acmerobotics.roadrunner.ftc.Actions;
 
 import java.util.function.DoubleConsumer;
 import java.util.function.BooleanSupplier;
@@ -85,8 +87,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
     private double sampleSensingDistance;
 
-    private int CHAMBER_EXTENSION = 1500;
-    private int TWELVE_INCHES_EXTENSION = 1150;
+    private int CHAMBER_EXTENSION = 2500;
+    private int TWELVE_INCHES_EXTENSION = 1700;
     private int FULLY_RETRACTED = 600;
     
     private double EXTENSION_POWER = 1.0; // Previously 0.15
@@ -588,14 +590,14 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void extendAsync() throws InterruptedException {
-        lift.extendSlides(TWELVE_INCHES_EXTENSION, 30, EXTENSION_POWER);
+        lift.extendSlides(TWELVE_INCHES_EXTENSION, 10, EXTENSION_POWER);
     }
 
     private void extendSync() {
         AutoInit.driveMotorTo(
             linearSlideLift, 
             TWELVE_INCHES_EXTENSION, 
-            30, 
+            10, 
             EXTENSION_POWER
         );
     }
@@ -632,27 +634,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      */
     private void grabSampleAsync() throws InterruptedException {
         // Presssing the grab button
-        gamepad2.right_trigger = 1.0f;
-        // DEV START: Debugging grab pause ~ initial position line
-        final int initialSlidePos = linearSlideLift.getCurrentPosition();
-        // DEV END
-
-        // Holding it until the lift realizes that the button has been pressed
-        while(!linearSlideState.equals(AutoArmRunner.LinearSlideStates.INTAKE_ATTEMPT_SAMPLE)) {
-            // DEV START ~ Debuggin grab pause ~ logging
-            telemetry.clear();
-            telemetry.addData("state", linearSlideState.name());
-            telemetry.addData("right_trigger", gamepad2.right_trigger);
-            telemetry.addData("inital_slide_pos", initialSlidePos);
-            telemetry.update();
-            // DEV END
-            sleep(30); // Allowing other threads to have some CPU time
-        }
-
-        // Stop holding it. (Knock it off.)
-        telemetry.addLine("did the thing");
-        telemetry.update();
-        gamepad2.right_trigger = 0;
+        linearSlideLift.setPower(0);
+        isStateInitialized = false;
+        linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
+        intakeWheelR.setPower(INTAKE_POWER_HOLD);
+        intakeWheelL.setPower(INTAKE_POWER_HOLD);
     }
 
     /**
@@ -664,11 +650,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void depositAsync() throws InterruptedException {
-        gamepad2.right_trigger = 1.0f; // Move intake for desposit
-        gamepad2.right_bumper = true; // Deposit
-        sleep(150);
-        gamepad2.right_trigger = 0;
-        gamepad2.right_bumper = false;
+        intakePivot.setPosition(SERVO_VALUES.pivotAlternateDepositPos);
+        sleep(400);
+        intakeWheelR.setPower(INTAKE_POWER_EMPTY);
+        intakeWheelL.setPower(INTAKE_POWER_EMPTY);
     }
     
     /**
@@ -701,29 +686,41 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      *  
      * @throws InterruptedException
      */
-    private void grabSampleSync() throws InterruptedException {
+    private void grabSampleSync(boolean retry) throws InterruptedException {
         // TODO: Make this retry if nothing is grabbed
         telemetry.addLine("Extending to sample...");
         telemetry.update();
+        lift.waitForFinish(); // Wait for the arm to finish retraction
         extendSync();
         // lift.waitForExtension(); // Waiting for full extension
 
-        telemetry.addLine("Switching to intake mode to grab...");
-        telemetry.update();
-        // Pivoting ignores the intake button, so we wait for that to finish.
-        while(!linearSlideState.equals(AutoArmRunner.LinearSlideStates.INTAKE_ACTIVE)) {
-            sleep(30); // Waiting whil giivng CPU to the other threads.
-        }
-        grabSampleAsync(); // Grab the sample
+        retryLoop:
+        while(!isPossessingSample(currentSampleDistance)) {
+            telemetry.addLine("Switching to intake mode to grab...");
+            telemetry.update();
+            grabSampleAsync(); // Grab the sample
 
-        // Wait for completion
-        telemetry.addLine("Sleeping");
-        telemetry.update();
-        while(
-            !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
-            || !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
-        ) {
-            sleep(30); // Waiting whilst freeing CPU for other threads
+            // Wait for completion
+            telemetry.addLine("Sleeping");
+            telemetry.update();
+            // CAPUT MEUM DOLET.
+            while(
+                !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
+                && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
+                && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
+            ) {
+                sleep(30); // Waiting whilst freeing CPU for other threads
+            }
+
+            // Exiting the retry loop if we don't want to retry
+            if(!retry) {
+                break retryLoop; 
+            }
+
+            // Moving so that we have more chance of getting it.
+            setDestinationOffset(new Pose2d(1, 2, 0)); // Move from current position forward and a sample up
+            lineTo(globalDrive, getCurrentPosition());
+            resetDestinationOffset();
         }
     }
 
@@ -739,13 +736,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         sleep(500); // To stop from accidentally moving too fast
 
         // Protecting the intake
-        gamepad2.right_trigger = 1.0f; // Protect intake
-        sleep(200);
-        gamepad2.right_trigger = 0f;
+        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+        sleep(300);
 
         // Lowering and switching
         switchArmAsync();
-        lift.waitForSwitch();
     }
 
     /**
@@ -791,6 +786,15 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         retractAsync();
     }
 
+    private void pivotDown() throws InterruptedException {
+        AutoInit.driveMotorTo(
+            linearSlidePivot, 
+            PIVOT_HANG_SPECIMEN, 
+            10, 
+            -1.0
+        );  
+    }
+
     /**
      * Moves the robot to the chambers and places the specimen. The linear 
      * slides are in the slightly retracted position, and the pivot is in deposit.
@@ -801,6 +805,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // moveToCloseChamberInitial(distFromChamber);
         // lift.waitForSwitch();
 
+        lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)) );
         lift.switchToChamber();
     
         // Wait for the pivot to be reasonably rotated before extending 
@@ -810,18 +815,35 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         }
 
         // Extend, move, and wait for the switch before hooking
+        final double SAFETY_DIST = 24; // Used to prevent contact with the 
         extendToChambersAsync();
-        lineTo(globalDrive, new Pose2d(-36, ROBOT_CENTER.position.y, 0));
+        // lineTo(globalDrive, new Pose2d(
+        //     BLUE_CHAMBER.position.x - SAFETY_DIST, 
+        //     BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y, 
+        //     0
+        // ));
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d dest = new Pose2d(
+            BLUE_CHAMBER.position.x - SAFETY_DIST, 
+            BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y, 
+            0
+        );
+        Actions.runBlocking(globalDrive.actionBuilder(currentPos)
+            .setTangent(Math.atan2(currentPos.position.y - dest.position.y, currentPos.position.x - dest.position.x))
+            .lineToY(dest.position.y, new TranslationalVelConstraint(20.0))
+            .build()
+        );
         resetDestinationOffset();
         lift.waitForFinish();
 
         
         // Moving forward and hooking onto the chamber'
         // lineTo(globalDrive, BLUE_BUCKETS_CHAMBER);
+        pivotDown(); // Lowering the motor to prevent collisions
         hookChamber();
         
         // Waiting for the hook to fully... well, hook.
-        while(linearSlideLift.getCurrentPosition() >= FULLY_RETRACTED) {
+        while(linearSlideLift.getCurrentPosition() >= FULLY_RETRACTED + 30) {
             sleep(30); // Wait whiling freeing up CPU for other threads.
         }
     }
@@ -880,13 +902,16 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // Driving to the chamber and scoring
         timer = timeSection("chamber_inital");
         globalDrive.updatePoseEstimate();
+        // globalDrive.maxWheelVel = 25;
+        if(!arg) {
         moveAndPlaceSpecimen();
         switchArmAsync(); // Lowring the arm
+        // globalDrive.maxWheelVel = 40;
         logTime(timer);
-
-        if(arg) {
-            return;
         }
+        // if(arg) {
+        //     return;
+        // }
 
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
@@ -895,7 +920,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
             final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
             final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(-16, 0, 0);
+            final Pose2d grabbingDistance = new Pose2d(-20, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -919,11 +944,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
             // Grabbing the pixel
             resetDestinationOffset();
-            
             timer = timeSection("grab_sample_" + (3 - i));
             telemetry.addLine("\n=====> Grabbing the sample...");
             telemetry.update();
-            grabSampleSync(); // Grab the pixel. and retract
+            grabSampleSync(false); // Grab the pixel. and retract
             logTime(timer);
             isTime = false;
 
@@ -940,11 +964,21 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             globalDrive.updatePoseEstimate();
 
             timer = timeSection("move_zone_" + (3 - i));
+            final double DIST_BACK = 6;
+            final double SQRT2 = Math.sqrt(2);
+            final Pose2d BACK_AWAY = new Pose2d(DIST_BACK / SQRT2, -DIST_BACK / SQRT2, 0); // don't go too close to the buckets
+            setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
             moveRobotToNetZone(isBlue);
+            resetDestinationOffset();
             logTime(timer);
 
+            
+            // Waiting for the pivot to get up before extendning
+            // final double PIVOT_BUCKET_SAFETY = (PIVOT_ALTERNATE_DEPOSIT_POSITION + PIVOT_MIN_POSITION) / 2;
+            lift.waitForSwitch();
+            
+            // Extending to the buckets
             timer = timeSection("arm_raise_" + (3 - i));
-            // extendToBucketsAsync();
             extendToBucketsSync();
             lift.waitForFinish();
             logTime(timer);
@@ -957,6 +991,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             berriddenOfSample();
             logTime(timer);
         }
+
+        // Retracting fully after the last basket
+        driveMotorTo(linearSlideLift, 0, 10, -SLIDE_SPEED);
 
         // lift.close();
 
@@ -999,7 +1036,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     @Override
     public void opMode_start() {
         try {
-            main(false);
+            main(true);
         } catch(InterruptedException err) {
             telemetry.addData("!! CAUGHT FATAL ERROR IN MAIN", err.getMessage());
             telemetry.update();

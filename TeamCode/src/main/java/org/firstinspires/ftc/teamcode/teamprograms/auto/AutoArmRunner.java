@@ -86,7 +86,7 @@ public class AutoArmRunner extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.44;
+        public double pivotIntakePos = 0.42;
         public double pivotDepositPos = 0.85;
         public double pivotAlternateDepositPos = 0.34;
         public double pivotRestPos = 0.52;
@@ -127,7 +127,7 @@ public class AutoArmRunner extends LinearOpMode {
         public double cushionRatio = 400;
         public int resetLevelPos = 100;
         public int hangPos = 3700;
-        public int attmeptSamplePos = 100;
+        public int attmeptSamplePos = 0;
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
 
@@ -136,7 +136,8 @@ public class AutoArmRunner extends LinearOpMode {
     final int PIVOT_MIN_POSITION = 0;
     final int PIVOT_ALTERNATE_DEPOSIT_POSITION = 2850;
     final int PIVOT_ALTERNATE_RETRACT_SET_POSITION = 3200;
-    final int PIVOT_CHAMBER = 2300;
+    final int PIVOT_CHAMBER = 1800;
+    final int PIVOT_HANG_SPECIMEN = 1500;
 
 
 
@@ -162,7 +163,7 @@ public class AutoArmRunner extends LinearOpMode {
     // constant variables
     final double SLIDE_SPEED = 0.7; // was 0.5
     final double PIVOT_SPEED = 1.0;
-    final int PIVOT_TOLERANCE = 33; // How far the pivot can be from its position before stopping
+    final int PIVOT_TOLERANCE = 15; // How far the pivot can be from its position before stopping
     private double pivotReverseFactor = 1; // Set AutoInit.driveMotorToIterative
 
     boolean tankDrive = true;
@@ -170,6 +171,10 @@ public class AutoArmRunner extends LinearOpMode {
     boolean alternateDeposit = true;
 
     int manualPivotCheckpoint = 0;
+    
+    boolean isStateInitialized = false;
+    
+    double currentSampleDistance;
 
 
     @Override
@@ -227,9 +232,9 @@ public class AutoArmRunner extends LinearOpMode {
 
         // STATE MACHINE LOGIC
 
-        boolean isStateInitialized = false;
         boolean isIntakeProtected = false;
         boolean isArmPositionSet = true;
+        currentSampleDistance = sampleSensor.getDistance(DistanceUnit.CM);
 //        boolean overrideSampleSensor = true;
 
         // WAIT LOOP ----------------------------------------------------------------------------
@@ -303,8 +308,7 @@ public class AutoArmRunner extends LinearOpMode {
             double linearSlidePower = 0;
             double linearSlidePosition = linearSlideLift.getCurrentPosition();
             boolean limitSwitch = linearSlideSwitch.isPressed();
-
-            double currentSampleDistance = sampleSensor.getDistance(DistanceUnit.CM);
+            currentSampleDistance = sampleSensor.getDistance(DistanceUnit.CM);
 
             double pivotPosition = linearSlidePivot.getCurrentPosition();
             boolean resetSwitch = pivotResetSwitch.isPressed();
@@ -532,6 +536,9 @@ public class AutoArmRunner extends LinearOpMode {
                             isStateInitialized = false;
                             linearSlideState = LinearSlideStates.INTAKE_EMPTY;
                         }
+                        // linearSlideLift.setPower(0);
+                        // isStateInitialized = false;
+                        // linearSlideState = LinearSlideStates.INTAKE_FULL;
                     } else if (isArmPositionSet && lightTimer.seconds() > 0.5) {
                         // bring intake up for a short period to secure sample
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
@@ -688,7 +695,7 @@ public class AutoArmRunner extends LinearOpMode {
                 case INTAKE_EMPTY:
 
                     if (!isStateInitialized) {
-                        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+                        // intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
                         lightTimer.reset();
@@ -843,8 +850,8 @@ public class AutoArmRunner extends LinearOpMode {
                     // (and once slide has finished retracting)
                     if (Math.abs(pivotPosition-linearSlidePivot.getTargetPosition()) < PIVOT_TOLERANCE &&
                         isArmPositionSet) {
-                        linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlidePivot.setPower(0);
                         isStateInitialized = false;
                         pivotReverseFactor = 1; // Reset the factor 
 
@@ -854,6 +861,7 @@ public class AutoArmRunner extends LinearOpMode {
                             linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
                         }
                     } else {
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         pivotReverseFactor *= AutoInit.driveMotorToIterative(
                             linearSlidePivot, 
                             linearSlidePivot.getTargetPosition(), 

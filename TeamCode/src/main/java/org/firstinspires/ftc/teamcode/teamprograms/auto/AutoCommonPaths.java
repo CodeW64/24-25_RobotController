@@ -36,7 +36,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
     public final Vector2d FEILD_CENTER = new Vector2d(0, 0); // Origin
 
     public final static Pose2d BLUE_SIDE_TAG = new Pose2d(-72, 0, Math.toRadians(180 - 1e-10)); 
-    public final static Pose2d BLUE_NET = new Pose2d(-52, 52, Math.toRadians(135)); 
+    public final static Pose2d BLUE_NET = new Pose2d(-60, 60, Math.toRadians(135)); 
     public final static Pose2d BLUE_OBSERVATION = new Pose2d(-60, 48, Math.toRadians(-135)); 
     public final static Pose2d BLUE_NEUTRAL_TAG = new Pose2d(-48, 72, Math.toRadians(90)); 
     public final static Pose2d BLUE_COLORED_TAG = new Pose2d(-48, -72, Math.toRadians(-90));
@@ -360,7 +360,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
     }
 
     /**
-     * Moves the robot to the given spike mark away from the given April tag
+     * Moves the robot to the given spike mark away from the given April tag. 
      * 
      * @param tag AprilTagDetection - Position data for the corresponding April Tag
      * @param markNum int - The 0-based index of the mark away from the wall. 0 

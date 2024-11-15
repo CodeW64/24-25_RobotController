@@ -512,6 +512,7 @@ public class SamplePreloadBasket extends AutoCommonPaths {
         depositAsync();
         sleep(500); // To stop from accidentally moving too fast
         toggleArmToDepositAsync(); // Changing arm position
+        depositAsync();
         sleep(2000);
     }
 
@@ -575,7 +576,7 @@ public class SamplePreloadBasket extends AutoCommonPaths {
         sleep(SWITCH_TIME); 
         extendToBucketsAsync(); // Extend there
         lift.waitForFinish();
-        netMoveSync(8); // Move forward 8 inches
+        // netMoveSync(8); // Move forward 8 inches
         berriddenOfSample(); // Aaaaand deposit and return!
 
         // Driving to the spike marks
@@ -609,7 +610,9 @@ public class SamplePreloadBasket extends AutoCommonPaths {
             
             // Scoring!
             globalDrive.updatePoseEstimate();
+            setDestinationOffset(new Pose2d(8, -8, 0));
             moveRobotToNetZone(isBlue);
+            resetDestinationOffset();
             extendToBucketsAsync();
             lift.waitForFinish();
             netMoveSync(8); // inches 
