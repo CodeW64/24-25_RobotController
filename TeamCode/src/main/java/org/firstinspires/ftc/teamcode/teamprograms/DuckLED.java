@@ -4,7 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.LED;
 
-@TeleOp
+@TeleOp(group = "Quack")
 public class DuckLED extends LinearOpMode {
 
     LED duckLEDRed, duckLEDGreen;

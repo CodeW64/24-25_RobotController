@@ -6,7 +6,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
-@TeleOp
+@TeleOp(group = "Z")
 public class SimpleDrive extends LinearOpMode {
 
     DcMotorEx frontRight, backRight, frontLeft, backLeft;

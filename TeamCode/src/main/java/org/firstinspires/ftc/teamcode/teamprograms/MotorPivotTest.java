@@ -4,7 +4,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 
-@TeleOp
+@TeleOp(group = "Z")
 public class MotorPivotTest extends LinearOpMode {
 
     DcMotorEx twistMotor, otherTwistMotor;
