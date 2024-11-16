@@ -34,7 +34,7 @@ public final class TwoDeadWheelLocalizer implements Localizer {
 
         // used to correct IMU inaccuracy when turning multiple times in the same direction
         // adjust as needed
-        public double headingMultiplier = 0.004555; // custom variable | 0.002755 LOGO UP USB FORWARD
+        public double headingMultiplier = 0.008955; // custom variable | 0.002755 LOGO UP USB FORWARD
     }
 
     public static Params PARAMS = new Params();

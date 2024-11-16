@@ -110,7 +110,7 @@ public class SamplePusherAuto extends AutoCommonPaths {
             toggleBlueSide.activateIfPressed();
             toggleObservationPark.activateIfPressed();
             repositionToggle.activateIfPressed();
-        } catch(NoSuchFieldException | IllegalAccessException err) {
+        } catch(IllegalAccessException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err);
         }
 

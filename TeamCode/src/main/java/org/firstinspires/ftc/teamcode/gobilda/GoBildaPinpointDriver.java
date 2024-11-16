@@ -286,7 +286,7 @@ public class GoBildaPinpointDriver extends I2cDeviceSynchDevice<I2cDeviceSynchSi
      * The X pod offset refers to how far sideways (in mm) from the tracking point the X (forward) odometry pod is. Left of the center is a positive number, right of center is a negative number. <br>
      * the Y pod offset refers to how far forwards (in mm) from the tracking point the Y (strafe) odometry pod is. forward of center is a positive number, backwards is a negative number.<br>
      * @param xOffset how sideways from the center of the robot is the X (forward) pod? Left increases
-     * @param yOffset how far forward from the center of the robot is the Y (Strafe) pod? forward increases
+     * @param yOffset how far forward from the center of the robot is the Y (Strafe) pod? Forward increases
      */
     public void setOffsets(double xOffset, double yOffset){
         writeFloat(Register.X_POD_OFFSET, (float) xOffset);

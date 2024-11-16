@@ -8,6 +8,7 @@ import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
+import org.firstinspires.ftc.teamcode.gobilda.RRGobildaLocalizer;
 
 @TeleOp(group = "C")
 public class CustomSplineLoop extends LinearOpMode {
@@ -53,6 +54,10 @@ public class CustomSplineLoop extends LinearOpMode {
 
             // update telemetry
             drive.updatePoseEstimate();
+            if (drive.localizer instanceof RRGobildaLocalizer) {
+                telemetry.addData("goBilda IMU hasReturnedNaN", ((RRGobildaLocalizer) drive.localizer).hasReturnedNaN);
+            }
+            telemetry.addLine("-------------------------");
             telemetry.addLine("Path End Readings");
             telemetry.addData("X", drive.pose.position.x);
             telemetry.addData("Y", drive.pose.position.y);

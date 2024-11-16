@@ -41,6 +41,7 @@ import com.qualcomm.robotcore.hardware.VoltageSensor;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.YawPitchRollAngles;
+import org.firstinspires.ftc.teamcode.gobilda.GoBildaFullLocalizer;
 import org.firstinspires.ftc.teamcode.gobilda.GoBildaPinpointDriver;
 import org.firstinspires.ftc.teamcode.gobilda.RRGobildaLocalizer;
 import org.firstinspires.ftc.teamcode.messages.DriveCommandMessage;
@@ -272,8 +273,10 @@ public final class MecanumDrive {
         bildaDriver = hardwareMap.get(GoBildaPinpointDriver.class, "bildaDriver");
 
 
-//        localizer = new TwoDeadWheelLocalizer(hardwareMap, lazyImu.get(), PARAMS.inPerTick);
-        localizer = new RRGobildaLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+        // FIXME: use localizer needed
+        localizer = new TwoDeadWheelLocalizer(hardwareMap, lazyImu.get(), PARAMS.inPerTick);
+//        localizer = new GoBildaFullLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+//        localizer = new RRGobildaLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
 
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
@@ -505,6 +508,8 @@ public final class MecanumDrive {
 
     public PoseVelocity2d updatePoseEstimate() {
         Twist2dDual<Time> twist = localizer.update();
+
+
         pose = pose.plus(twist.value());
 
         poseHistory.add(pose);

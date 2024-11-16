@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
 import org.firstinspires.ftc.robotcore.external.Telemetry;
 import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.util.Range;
 import com.qualcomm.robotcore.hardware.IMU;
@@ -159,7 +160,7 @@ abstract public class AutoInit extends AutoArmRunner {
      */
     protected void initPushBot() {
         // Setting perferred telemetry settings
-         //telemetry.setAutoClear(false);
+        // telemetry.setAutoClear(false);
         telemetry.setDisplayFormat(Telemetry.DisplayFormat.MONOSPACE);
 
         // Initialize the hardware variables. Note that the strings used here as parameters
@@ -215,6 +216,66 @@ abstract public class AutoInit extends AutoArmRunner {
         }
     }
     
+    /**
+     * Rotates the given motor at a given power until the target is reached, 
+     * with some tolerance. A motor encoder must be connected to the motor for 
+     * this method to work.
+     * 
+     * @param motor the motor to drive.
+     * @param tickTarget Where to rotate to.
+     * @param tolerance The maximum allowed differnece between the target 
+     *     and the motor's end position. The difference is absolute, so the 
+     *     size of the allowed range is equal to 2 * tolerance. 
+     * @param power How powerful the motor should be run. Positive values 
+     *     extend, negative retract.
+     */
+    public static void driveMotorTo(DcMotor motor, int tickTarget, int tolerance, double power) {
+        double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
+        while(Math.abs(motor.getCurrentPosition() - tickTarget) > tolerance) {
+            if((tickTarget - motor.getCurrentPosition()) / (reverseFactor * power) < 0) {
+                reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed 
+            }
+            motor.setPower(reverseFactor * power);
+        }
+        motor.setPower(0); // Stop the motor from continuing
+    }
+
+    /**
+     * Rotates the given motor at a given power until the target is reached, 
+     * with some tolerance. A motor encoder must be connected to the motor for 
+     * this method to work.
+     * 
+     * <p> The intent of this method is that it is used in a iterative loop() 
+     * method or in the loop of a runOpMode() method so that the motor is driven 
+     * in parallel with other actions.
+     * 
+     * @param motor the motor to drive.
+     * @param tickTarget Where to rotate to.
+     * @param tolerance The maximum allowed differnece between the target 
+     *     and the motor's end position. The difference is absolute, so the 
+     *     size of the allowed range is equal to 2 * tolerance. 
+     * @param power How powerful the motor should be run. Positive values 
+     *     extend, negative retract.
+     * @param reverseFactor A value that is meant to be multiplied by the power
+     *     argument in the next call.
+     */
+    public static double driveMotorToIterative(DcMotor motor, int tickTarget, int tolerance, double power) {
+        double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
+        if(Math.abs(motor.getCurrentPosition() - tickTarget) > tolerance) {
+            // Revsering the speed if the target was missed.
+            if((tickTarget - motor.getCurrentPosition()) / (reverseFactor * power) < 0) {
+                reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed
+            }
+
+            // Setting the power
+            motor.setPower(reverseFactor * power);
+        } else {
+            motor.setPower(0);
+        }
+
+        return reverseFactor;
+    }
+
     /**
      * Executes code once the INIT button is pressed. Can be overridden by 
      * subclasses for further user-defined functionality.

@@ -13,10 +13,12 @@ import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+import org.firstinspires.ftc.teamcode.FailedInitializationException;
+import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 0.6.0 BETA
+ * Teleop Version: 1.4.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -30,31 +32,33 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  * [left_trigger] - Slide left
  * [right_bumper] - Increase max speed
  * [left_bumper] - Lower max speed
- * [dpad_right + x_button] - reset pivot if disconnected (DANGEROUS)
+ * [y_button] - run to an april tag (use for bucket tags)
+ * [dpad_right + x_button] - reset pivot automatically if disconnected (DANGEROUS)
+ * [dpad_up] - manually raise pivot by given number of ticks, go to stasis
+ * [button_a] - exit manual pivot adjustment (manual pivot stasis)
+ * [dpad_down] - manually lower pivot by given number of ticks, go to stasis
+ * [button_b] - increase hanging position for pivot slightly (pivot hang)
+ * [button_a] - decrease hanging position for pivot slightly (pivot hang)
+ * [back_button] - enable/disable duck spinner
  * --------------------------
  * Gamepad 2 (lift)
  * [right_stick_y] - extend/retract slides
- * [left_stick_y] - pivot slides (only in HANG_TIME)
  * [right_bumper] - divide samples (intake)
  * [right_bumper] - set intake wheels to empty (deposit)
- * [left_bumper] - move to old deposit position (intake)
  * [left_bumper] - set intake wheels to low speed (deposit)
- * [b_button] - reverse direction of intake wheels (intake)
  * [left_trigger] - flip between intake and deposit
  * [right_trigger] - move intake to and from deposit position (deposit)
  * [right_trigger] - attempt sample grab (intake)
  * [y_button] - empty intake when full (intake full)
  * [x_button/y_button] - override limit switch (retract and pivot states)
- * [dpad_down + a_button] - enter MANUAL_OVERRIDE
- * --------------------------
- * Combined gamepad controls
- * [gamepad1 dpad_up + gamepad2 dpad_up] - enter/exit HANG_TIME (only in DEPOSIT_ACTIVE)
+ * [dpad_up] - enter/exit HANG_TIME (from deposit mode)
+ * [dpad_down + a_button] - enter MANUAL_OVERRIDE (DANGEROUS)
  * --------------------------
  * MANUAL_OVERRIDE (affects Gamepad 2 only)
  * NOTE: this mode is EXTREMELY DANGEROUS (yes, more than last year)
- *      BE ALERT: the worm gear does not have an automatic stop;
- *      if you are not careful, the robot can be bent severely
- * --------------------------
+ *      BE ALERT: if the robot has disconnected, the robot does not know
+ *                where the pivot position should be; during this, DO NOT TRY TO EXIT
+ *
  * Gamepad 2 (lift)
  * [right_stick_y] - extend/retract slides
  * [left_stick_y] - pivot slides
@@ -78,15 +82,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     DcMotorEx linearSlideLift, linearSlidePivot;
     CRServo intakeWheelR, intakeWheelL;
     Servo intakePivot;
+    CRServo duckSpinner;
 
     ColorRangeSensor sampleSensor;
     TouchSensor linearSlideSwitch, pivotResetSwitch;
+    RobotVision glasses;
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.44;
-        public double pivotDepositPos = 0.85;
-        public double pivotAlternateDepositPos = 0.34;
+        public double pivotIntakePos = 0.42;
+        public double pivotEjectSamplePos = 0.85;
+        public double pivotDepositPos = 0.34;
         public double pivotRestPos = 0.52;
         public double pivotHangPos = 0.2;
     }
@@ -98,41 +104,55 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     final double INTAKE_POWER_EMPTY = -0.3;
     final double INTAKE_POWER_ZERO = 0;
 
+    // DUCK VALUES (editable by FTC dashboard)
+    public static class DuckValues {
+        public double spinStop = 0.0;
+        public double spinRest = 0.15;
+        public double spinActive = 0.3;
+        public double spinHyperActive = 0.5;
+    }
+    public static DuckValues DUCK_VALUES = new DuckValues();
+
 
     // SENSOR VARIABLES (editable by FTC dashboard)
     public static class SensorVariables {
         public float sampleSensorGain = 1.0f;
         public double sampleDistance = 3.2;
         public double sampleCodeBlue = 0.007;
+        public double glassesDistance = 11; // inches
+        public double glassesBearing = 7; // degrees
+        public double glassesYaw = 5; // degrees
+        public double glassesCameraAngle = 60; // degrees
     }
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
 
-    // SLIDE VARIABLES
+    // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimit = 2400;
-        public double topBucketHeight = 3800;
-        public double bottomBucketHeight = 1900;
+        public double extensionLimitIntake = 2400;
+        public double extensionLimitHang = 3800;
         public double cushionRatio = 400;
         public double topBucketHeightAlternate = 4200;
-        public double bottomBucketHeightAlternate = 2200;
 
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
 
+    // PIVOT VARIABLES (editable by FTC dashboard)
     public static class PivotConstants {
         public double cushionRatio = 400;
-        public int resetLevelPos = 100;
-        public int hangPos = 3700;
-        public int attmeptSamplePos = 100;
+        public int resetLevelPos = 90; // 435 RPM = 70 | 312 RPM = 100
+        public int hangPos = 3700; // 435 RPM = 2700 | 312 RPM = 3700
+        public int attemptSamplePos = 70; // 435 RPM = 50 | 312 RPM = 100
+
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
 
-    final int PIVOT_MAX_POSITION = 3600;
-    final int PIVOT_INTAKE_RETRACT_POSITION = 400;
+    // more pivot variables
+    final int PIVOT_MAX_POSITION = 3600; // 435 RPM = 2600 | 312 RPM = 3600
+    final int PIVOT_INTAKE_REST_POSITION = 400; // 435 RPM = 300 | 312 RPM = 400
     final int PIVOT_MIN_POSITION = 0;
-    final int PIVOT_ALTERNATE_DEPOSIT_POSITION = 2850;
-    final int PIVOT_ALTERNATE_RETRACT_SET_POSITION = 3200;
+    final int PIVOT_DEPOSIT_POSITION = 2850; // 435 RPM = 2050 | 312 RPM = 2850
+    final int PIVOT_DEPOSIT_RETRACT_SET_POSITION = 3200; // 435 RPM = 2300 | 312 RPM = 3200
 
 
 
@@ -143,11 +163,11 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         INTAKE_ACTIVE, INTAKE_ATTEMPT_SAMPLE, INTAKE_DIVIDE_SAMPLE, INTAKE_FULL, INTAKE_EMPTY,
         INTAKE_RETRACT_SET, INTAKE_RETRACT, INTAKE_EXTEND, PIVOT_TO_DEPOSIT,
 
-        DEPOSIT_ACTIVE, DEPOSIT_RETRACT_SET, DEPOSIT_RETRACT, PIVOT_TO_INTAKE,
-        DEPOSIT_ALTERNATE_ACTIVE, DEPOSIT_ALTERNATE_RETRACT_SET, PIVOT_REVERSE_ALTERNATE,
-        HANG_TIME, PIVOT_TO_HANG_TIME,
+        DEPOSIT_ACTIVE,
+        DEPOSIT_RETRACT_SET, DEPOSIT_RETRACT, PIVOT_TO_INTAKE,
+        HANG_TIME, PIVOT_TO_HANG_TIME, PIVOT_TO_DEPOSIT_REVERSE,
 
-        MANUAL_OVERRIDE, MANUAL_LOWER_PIVOT, MANUAL_RAISE_PIVOT, MANUAL_PIVOT_STASIS, // not functional?
+        MANUAL_OVERRIDE, MANUAL_LOWER_PIVOT, MANUAL_RAISE_PIVOT, MANUAL_PIVOT_STASIS,
         RESET_PIVOT_LOWER, RESET_PIVOT_LEVEL
     }
 
@@ -161,10 +181,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     final double PIVOT_SPEED = 1.0;
 
     boolean tankDrive = true;
+    boolean disableDuck = false;
+    boolean runningToBucketAprilTag = false;
+    boolean camera = true; // disable if camera not in use or if it doesn't exist
 
-    boolean alternateDeposit = true;
 
-    int manualPivotCheckpoint = 0;
+    int manualPivotCheckpoint = 0; // used for manual lowering/raising of slide pivot for reset
+    int adjustedPivotHangPos = PIVOT_CONSTANTS.hangPos; // used if robot can't reach bar
 
 
     @Override
@@ -212,11 +235,15 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         boolean checkGOneDDOWN = true;
         boolean checkGOneDUP = true;
-        boolean checkGOneA = true;
 
         boolean checkGOneDRIGHT = true;
         boolean checkGOneX = true;
         boolean checkGOneY = true;
+
+        boolean checkGOneB = true;
+        boolean checkGOneA = true;
+
+        boolean checkGOneBACK = true;
 
         lightTimer = new ElapsedTime();
 
@@ -225,7 +252,6 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         boolean isStateInitialized = false;
         boolean isIntakeProtected = false;
         boolean isArmPositionSet = true;
-//        boolean overrideSampleSensor = true;
 
         // WAIT LOOP ----------------------------------------------------------------------------
 
@@ -242,14 +268,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 0.6.0 BETA");
+            telemetry.addLine("TELEOP VERSION 1.4.0 RELEASE");
             telemetry.addLine("-------------------------");
-//            telemetry.addData("COLOR SENSOR OVERRIDDEN", overrideSampleSensor);
             telemetry.addData("TANK DRIVE", tankDrive);
-            telemetry.addLine("Press Start");
-            telemetry.addLine("-------------------------");
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
             telemetry.addLine("CONTROLLER 1 BUTTON B: MECANUM DRIVE");
+            telemetry.addLine("-------------------------");
+            telemetry.addLine("Press Start");
             telemetry.update();
         }
 
@@ -285,11 +310,26 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
             if (!gamepad1.dpad_down) checkGOneDDOWN = false;
             if (!gamepad1.dpad_up) checkGOneDUP = false;
-            if (!gamepad1.a) checkGOneA = false;
 
             if (!gamepad1.dpad_right) checkGOneDRIGHT = false;
             if (!gamepad1.x) checkGOneX = false;
             if (!gamepad1.y) checkGOneY = false;
+            if (!gamepad1.b) checkGOneB = false;
+            if (!gamepad1.a) checkGOneA = false;
+
+            if (!gamepad1.back) checkGOneBACK = false;
+
+
+            // DUCK ----------------------------------------------------------------------------
+
+            if (gamepad1.back && !checkGOneBACK && !disableDuck) {
+                checkGOneBACK = true;
+                duckSpinner.setPower(DUCK_VALUES.spinStop);
+                disableDuck = true;
+            } else if (gamepad1.back && !checkGOneBACK && disableDuck) {
+                checkGOneBACK = true;
+                disableDuck = false;
+            }
 
 
             // LIFT ----------------------------------------------------------------------------
@@ -311,20 +351,22 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 checkGTwoDDOWN = true;
                 checkGTwoA = true;
                 intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                duckSpinner.setPower(DUCK_VALUES.spinStop);
                 linearSlideState = LinearSlideStates.MANUAL_OVERRIDE;
             }
 
-            // enter PIVOT_RESET states
-            // NOTE: this is dangerous
-            // if (gamepad1.dpad_right && !checkGOneDRIGHT &&
-            //     gamepad1.x && !checkGOneX &&
-            //     linearSlideState != LinearSlideStates.RESET_PIVOT_LOWER &&
-            //     linearSlideState != LinearSlideStates.RESET_PIVOT_LEVEL) {
-            //     checkGOneDRIGHT = true;
-            //     checkGOneX = true;
-            //     isStateInitialized = false;
-            //     linearSlideState = LinearSlideStates.RESET_PIVOT_LOWER;
-            // }
+            // enter RESET_PIVOT states
+            // NOTE: this state can be dangerous
+            if (gamepad1.dpad_right && !checkGOneDRIGHT &&
+                gamepad1.x && !checkGOneX &&
+                linearSlideState != LinearSlideStates.RESET_PIVOT_LOWER &&
+                linearSlideState != LinearSlideStates.RESET_PIVOT_LEVEL) {
+                checkGOneDRIGHT = true;
+                checkGOneX = true;
+                isStateInitialized = false;
+                duckSpinner.setPower(DUCK_VALUES.spinStop);
+                linearSlideState = LinearSlideStates.RESET_PIVOT_LOWER;
+            }
 
             // DANGEROUS ADJUSTMENTS
 
@@ -333,6 +375,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             if (gamepad1.dpad_down && !checkGOneDDOWN &&
                 linearSlideState != LinearSlideStates.MANUAL_LOWER_PIVOT) {
                 checkGOneDDOWN = true;
+                duckSpinner.setPower(DUCK_VALUES.spinStop);
                 linearSlideState = LinearSlideStates.MANUAL_LOWER_PIVOT;
             }
 
@@ -341,15 +384,10 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             if (gamepad1.dpad_up && !checkGOneDUP &&
                 linearSlideState != LinearSlideStates.MANUAL_RAISE_PIVOT) {
                 checkGOneDUP = true;
+                duckSpinner.setPower(DUCK_VALUES.spinStop);
                 linearSlideState = LinearSlideStates.MANUAL_RAISE_PIVOT;
             }
 
-            // exit manual pivot adjustment when finished
-            if (gamepad1.a && !checkGOneA &&
-            linearSlideState == LinearSlideStates.MANUAL_PIVOT_STASIS) {
-                checkGOneA = true;
-                linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
-            }
 
 // LIFT STATE MACHINE ----------------------------------------------------------------------------
 
@@ -360,20 +398,25 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case INTAKE_ACTIVE:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
 
-                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(PIVOT_SPEED);
+                        lightTimer.reset();
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
+
+
                     // PIVOT
 
-                    if (Math.abs(pivotPosition-PIVOT_INTAKE_RETRACT_POSITION) < 10) {
+                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -412,17 +455,6 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isStateInitialized = false;
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        alternateDeposit = true;
-                        linearSlideState = LinearSlideStates.INTAKE_RETRACT_SET;
-
-                    } else if (isArmPositionSet && gamepad2.left_bumper && !checkGTwoLB) {
-                        // OLD
-                        checkGTwoLB = true;
-                        linearSlideLift.setPower(0);
-                        isStateInitialized = false;
-                        linearSlidePivot.setPower(0);
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        alternateDeposit = false;
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT_SET;
                     }
                     break;
@@ -435,7 +467,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelR.setPower(INTAKE_POWER_MAX);
                         intakeWheelL.setPower(INTAKE_POWER_MAX);
                         intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
-                        linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.attmeptSamplePos);
+
+                        linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.attemptSamplePos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(-PIVOT_SPEED);
                         isArmPositionSet = false;
@@ -443,10 +476,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
+
+
                     // PIVOT
 
                     // move pivot down to 0 so it can grab a sample
-                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attmeptSamplePos) < 10) {
+                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -499,7 +534,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelR.setPower(INTAKE_POWER_EMPTY);
                         intakeWheelL.setPower(INTAKE_POWER_EMPTY);
                         intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
-                        linearSlidePivot.setTargetPosition(PIVOT_MIN_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.attemptSamplePos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(-PIVOT_SPEED);
                         isArmPositionSet = false;
@@ -507,10 +542,11 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
+
                     // PIVOT
 
                     // move pivot down to 0 so it can grab a sample
-                    if (Math.abs(pivotPosition-PIVOT_MIN_POSITION) < 10) {
+                    if (Math.abs(pivotPosition-PIVOT_CONSTANTS.attemptSamplePos) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -552,20 +588,23 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case INTAKE_FULL:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinActive);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         isIntakeProtected = true;
                         intakeWheelR.setPower(INTAKE_POWER_HOLD);
                         intakeWheelL.setPower(INTAKE_POWER_HOLD);
 
-                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.9);
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
+
                     // PIVOT
-                    if (Math.abs(pivotPosition-PIVOT_INTAKE_RETRACT_POSITION) < 10) {
+                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 10 && !isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
@@ -580,7 +619,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     // move intake pivot to and from protected/default position
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT && !isIntakeProtected) {
                         checkGTwoRT = true;
-                        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotEjectSamplePos);
                         isIntakeProtected = true;
                     } else if (gamepad2.right_trigger > 0.1 && !checkGTwoRT && isIntakeProtected) {
                         checkGTwoRT = true;
@@ -588,7 +627,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isIntakeProtected = false;
                     }
 
-                    // TODO: remove once color recognition implemented
+                    // for ejecting wrong colored samples
                     if (gamepad2.y) {
                         linearSlideLift.setPower(0);
                         isStateInitialized = false;
@@ -607,19 +646,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isIntakeProtected = false;
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        alternateDeposit = true;
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT_SET;
 
-                    } else if (isArmPositionSet && gamepad2.left_bumper && !checkGTwoLB) {
-                        // OLD
-                        checkGTwoLB = true;
-                        linearSlideLift.setPower(0);
-                        isStateInitialized = false;
-                        isIntakeProtected = false;
-                        linearSlidePivot.setPower(0);
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        alternateDeposit = false;
-                        linearSlideState = LinearSlideStates.INTAKE_RETRACT_SET;
                     }
                     break;
 
@@ -627,7 +655,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case INTAKE_EMPTY:
 
                     if (!isStateInitialized) {
-                        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotEjectSamplePos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
                         lightTimer.reset();
@@ -657,20 +685,26 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
 
 
                     // EXIT
 
                     // stop pivot when it has reached the set position
                     // go to retract slides
-                    if (Math.abs(pivotPosition-PIVOT_INTAKE_RETRACT_POSITION) < 10) {
+                    if (Math.abs(pivotPosition - PIVOT_INTAKE_REST_POSITION) < 20) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
@@ -692,11 +726,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case INTAKE_RETRACT:
 
                     if (!isStateInitialized) {
+                        lightTimer.reset();
                         isStateInitialized = true;
                     }
 
                     if (!limitSwitch) {
-                        linearSlideLift.setPower(-1.0);
+                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                        linearSlideLift.setPower(-timeAccel);
                     } else {
                         linearSlideLift.setPower(0);
                     }
@@ -729,18 +765,21 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        // make pivot go to correct position based on deposit selection
-                        if (alternateDeposit) {
-                            linearSlidePivot.setTargetPosition(PIVOT_ALTERNATE_DEPOSIT_POSITION);
-                        } else {
-                            linearSlidePivot.setTargetPosition(PIVOT_MAX_POSITION);
-                        }
+                        linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isIntakeProtected = true;
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
+
 
 
                     // stop slides once finished retracting
@@ -751,7 +790,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     } else if (!isArmPositionSet) {
-                        linearSlideLift.setPower(-1.0);
+                        linearSlideLift.setPower(-SLIDE_SPEED);
                     }
 
 
@@ -759,17 +798,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     // make deposit accessible once lift has finished pivoting
                     // (and once slide has finished retracting)
-                    if (Math.abs(pivotPosition-linearSlidePivot.getTargetPosition()) < 10 &&
+                    // NOTE: pivot finishes in deposit mode
+                    if (Math.abs(pivotPosition - PIVOT_DEPOSIT_POSITION) < 300 &&
                         isArmPositionSet) {
-                        linearSlidePivot.setPower(0);
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+//                        linearSlidePivot.setPower(0);
+//                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-
-                        if (alternateDeposit) {
-                            linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE;
-                        } else {
-                            linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
-                        }
+                        linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
                     }
 
                     // ABORT
@@ -784,20 +819,35 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     }
                     break;
 
-            // lift in position to score samples (OLD)
+
+            // lift in position to score samples more accurately and safely (ALTERNATE)
+            // NOTE: drivetrain must turn around in this mode to deposit
                 case DEPOSIT_ACTIVE:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinHyperActive);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         isIntakeProtected = true;
                         intakeWheelR.setPower(INTAKE_POWER_HOLD);
                         intakeWheelL.setPower(INTAKE_POWER_HOLD);
+                        linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.9);
+                        isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
                     // SLIDES
                     linearSlidePower = calculateSlidePower(linearSlidePosition, false);
                     linearSlideLift.setPower(linearSlidePower);
+
+                    // PIVOT
+                    if (Math.abs(pivotPosition - PIVOT_DEPOSIT_POSITION) < 10) {
+                        linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isArmPositionSet = true;
+                    }
 
                     // SERVOS
 
@@ -826,93 +876,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     // begin leave of deposit mode
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
-                        linearSlideLift.setPower(SLIDE_CONSTANTS.gravityCoefficient);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
-                    }
-
-                    if (gamepad2.dpad_up && !checkGTwoDUP) {
-                        checkGTwoDUP = true;
-                        linearSlideLift.setPower(0);
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.HANG_TIME;
-                    }
-                    break;
-
-            // ready lift servos to retract slide (OLD)
-                case DEPOSIT_RETRACT_SET:
-
-                    if (!isStateInitialized) {
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
-                        lightTimer.reset();
-                        isStateInitialized = true;
-                    }
-
-                    // EXIT
-
-                    // retract slides when pivot has been set
-                    if (lightTimer.seconds() > 0.5) {
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
-                    }
-
-                    // ABORT
-
-                    // go back to deposit if mistaken
-                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
-                        checkGTwoLT = true;
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
-                    }
-                    break;
-
-            // lift in position to score samples more accurately and safely (ALTERNATE)
-            // NOTE: drivetrain must turn around in this mode to deposit
-                case DEPOSIT_ALTERNATE_ACTIVE:
-
-                    if (!isStateInitialized) {
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        isIntakeProtected = true;
-                        intakeWheelR.setPower(INTAKE_POWER_HOLD);
-                        intakeWheelL.setPower(INTAKE_POWER_HOLD);
-                        isStateInitialized = true;
-                    }
-
-                    // SLIDES
-                    linearSlidePower = calculateSlidePower(linearSlidePosition, false);
-                    linearSlideLift.setPower(linearSlidePower);
-
-                    // SERVOS
-
-                    // move intake pivot to and from deposit mode
-                    if (gamepad2.right_trigger > 0.1 && !checkGTwoRT && isIntakeProtected) {
-                        checkGTwoRT = true;
-                        intakePivot.setPosition(SERVO_VALUES.pivotAlternateDepositPos);
-                        isIntakeProtected = false;
-                    } else if (gamepad2.right_trigger > 0.1 && !checkGTwoRT && !isIntakeProtected) {
-                        checkGTwoRT = true;
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        isIntakeProtected = true;
-                    }
-
-                    // manipulate held sample by holding it or depositing
-                    if (gamepad2.left_bumper) {
-                        intakeWheelR.setPower(INTAKE_POWER_HOLD);
-                        intakeWheelL.setPower(INTAKE_POWER_HOLD);
-                    } else if (gamepad2.right_bumper) {
-                        intakeWheelR.setPower(INTAKE_POWER_EMPTY);
-                        intakeWheelL.setPower(INTAKE_POWER_EMPTY);
-                    }
-
-                    // EXIT
-
-                    // begin leave of deposit mode
-                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
-                        checkGTwoLT = true;
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
                     }
 
                     if (gamepad2.dpad_up && !checkGTwoDUP) {
@@ -925,23 +890,31 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     break;
 
             // ready lift to retract safely (ALTERNATE)
-                case DEPOSIT_ALTERNATE_RETRACT_SET:
+                case DEPOSIT_RETRACT_SET:
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
-                        linearSlidePivot.setTargetPosition(PIVOT_ALTERNATE_RETRACT_SET_POSITION);
+                        intakeWheelR.setPower(INTAKE_POWER_HOLD);
+                        intakeWheelL.setPower(INTAKE_POWER_HOLD);
+                        linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_RETRACT_SET_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
                         lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
+                    }
+
+
                     // EXIT
 
                     // retract slides when pivot has been set
-                    if (Math.abs(pivotPosition - PIVOT_ALTERNATE_RETRACT_SET_POSITION) < 10) {
+                    if (Math.abs(pivotPosition - PIVOT_DEPOSIT_RETRACT_SET_POSITION) < 20) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
@@ -956,30 +929,39 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_REVERSE_ALTERNATE;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
                     }
                     break;
 
             // cancel pivot to intake while pivot is shifted and ready to retract (ALTERNATE)
             // also used for HANG_TIME transition
-                case PIVOT_REVERSE_ALTERNATE:
+                case PIVOT_TO_DEPOSIT_REVERSE:
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        linearSlidePivot.setTargetPosition(PIVOT_ALTERNATE_DEPOSIT_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_DEPOSIT_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isStateInitialized = true;
                     }
 
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED)) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
+                    }
+
+
                     // EXIT
 
-                    // go back to
-                    if (Math.abs(pivotPosition - PIVOT_ALTERNATE_DEPOSIT_POSITION) < 10) {
-                        linearSlidePivot.setPower(0);
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    // go back to deposit
+                    // NOTE: finishes pivoting there
+                    if (Math.abs(pivotPosition - PIVOT_DEPOSIT_POSITION) < 200) {
+//                        linearSlidePivot.setPower(0);
+//                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE;
+                        linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
                     }
 
                     // ABORT
@@ -989,7 +971,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
+                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
                     }
 
                     // for HANG_TIME
@@ -1007,10 +989,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             // retract slide so it can pivot
                 case DEPOSIT_RETRACT:
 
-                    // TODO: eventually make slides slowly accelerate down
+                    if (!isStateInitialized) {
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+//                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
+//                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
+                        lightTimer.reset();
+                        isStateInitialized = true;
+                    }
 
                     if (!limitSwitch) {
-                        linearSlideLift.setPower(-0.9);
+                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                        linearSlideLift.setPower((-timeAccel)+SLIDE_CONSTANTS.gravityCoefficient);
                     } else {
                         linearSlideLift.setPower(0);
                     }
@@ -1018,6 +1007,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     // exit mode if slide has gone far enough to safely start pivoting
                     if (linearSlidePosition < 1800 || isLinearSlideFullyRetracted(limitSwitch)) {
+                        isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
                     }
 
@@ -1029,13 +1019,9 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setPower(0);
                         isStateInitialized = false;
                         isIntakeProtected = true;
-                        if (alternateDeposit) {
-                            // alternate deposit pivots slightly upon retract set
-                            // must go back to pivoting to deposit to fully reset
-                            linearSlideState = LinearSlideStates.PIVOT_REVERSE_ALTERNATE;
-                        } else {
-                            linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
-                        }
+                        // alternate deposit pivots slightly upon retract set
+                        // must go back to pivoting to deposit to fully reset
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
                     }
                     break;
 
@@ -1043,11 +1029,18 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case PIVOT_TO_INTAKE:
 
                     if (!isStateInitialized) {
-                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_RETRACT_POSITION);
+                        linearSlidePivot.setTargetPosition(PIVOT_INTAKE_REST_POSITION);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(-PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isArmPositionSet = false;
                         isStateInitialized = true;
+                    }
+
+                    // set power
+                    if (linearSlidePivot.getPower() > (-PIVOT_SPEED)) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(-timeAccel);
                     }
 
                     // stop slides once finished retracting
@@ -1058,17 +1051,18 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     } else if (!isArmPositionSet){
-                        linearSlideLift.setPower(-0.9);
+                        linearSlideLift.setPower(-SLIDE_SPEED);
                     }
 
                     // EXIT
 
-                    // make intake accessible once lift has finished pivoting
+                    // make intake accessible once lift has finished pivoting enough
                     // (and once slide has finished retracting)
-                    if (Math.abs(pivotPosition-PIVOT_INTAKE_RETRACT_POSITION) < 10 &&
+                    // NOTE: pivot finishes in intake modes
+                    if (Math.abs(pivotPosition- PIVOT_INTAKE_REST_POSITION) < 300 &&
                         isArmPositionSet) {
-                        linearSlidePivot.setPower(0);
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+//                        linearSlidePivot.setPower(0);
+//                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
 
                         // for in case deposit pivot was canceled
@@ -1088,30 +1082,62 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
                         isIntakeProtected = true;
-                        if (alternateDeposit && pivotPosition > PIVOT_ALTERNATE_DEPOSIT_POSITION) {
+                        if (pivotPosition > PIVOT_DEPOSIT_POSITION) {
                             linearSlideLift.setPower(0);
-                            linearSlideState = LinearSlideStates.PIVOT_REVERSE_ALTERNATE;
+                            linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
                         } else {
                             linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
                         }
                     }
                     break;
 
-            // allows slides to pivot manually (can enter from DEPOSIT_ACTIVE)
+            // allows slide to pivot so robot can hang (can enter from DEPOSIT_ACTIVE)
             // NOTE: this state is dangerous
                 case HANG_TIME:
 
                     if (!isStateInitialized) {
+                        duckSpinner.setPower(DUCK_VALUES.spinStop);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotHangPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
+
+                        adjustedPivotHangPos = PIVOT_CONSTANTS.hangPos;
+                        isArmPositionSet = true;
+
                         isStateInitialized = true;
                     }
 
-                    // TODO: make hang time slide power more sophisticated (find right speed ratios)
+                    // PIVOT
+
+                    // increase/decrease pivot position for hanging slightly
+                    if (gamepad1.b && !checkGOneB) {
+                        checkGOneB = true;
+                        adjustedPivotHangPos += 100;
+                        linearSlidePivot.setTargetPosition(adjustedPivotHangPos);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.5);
+                        isArmPositionSet = false;
+                    } else if (gamepad1.a && !checkGOneA) {
+                        checkGOneA = true;
+                        adjustedPivotHangPos -= 100;
+                        linearSlidePivot.setTargetPosition(adjustedPivotHangPos);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearSlidePivot.setPower((-PIVOT_SPEED)*0.5);
+                        isArmPositionSet = false;
+                    }
+
+                    // stop pivot movement when adjusted
+                    if (Math.abs(pivotPosition - adjustedPivotHangPos) < 10 && !isArmPositionSet) {
+                        linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isArmPositionSet = true;
+                    }
+
+                    // SLIDE
 
                     // determine cushion for the slide
-                    double linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeight - linearSlidePosition)
+                    double linearSlideCushion = (SLIDE_CONSTANTS.extensionLimitHang - linearSlidePosition)
                             /SLIDE_CONSTANTS.cushionRatio;
 
                     // use the power cushion if robot is extending, ignore if retracting
@@ -1136,13 +1162,9 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         checkGTwoDUP = true;
                         linearSlideLift.setPower(0);
                         linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-                        if (alternateDeposit) {
-                            // for alternate deposit, pivot must go backwards to deposit again
-                            linearSlideState = LinearSlideStates.PIVOT_REVERSE_ALTERNATE;
-                        } else {
-                            linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
-                        }
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
                     }
                     break;
 
@@ -1154,8 +1176,15 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         intakeWheelL.setPower(0);
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.hangPos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(0);
+                        lightTimer.reset();
                         isStateInitialized = true;
+                    }
+
+                    // set power
+                    if (linearSlidePivot.getPower() < PIVOT_SPEED) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), PIVOT_SPEED);
+                        linearSlidePivot.setPower(timeAccel);
                     }
 
                     // EXIT
@@ -1176,7 +1205,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_REVERSE_ALTERNATE;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
                     }
 
                     break;
@@ -1222,8 +1251,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         // pivot to grab position
                         intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
                     } else if (gamepad2.y) {
-                        // pivot to deposit position
-                        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+                        // pivot protected
+                        intakePivot.setPosition(SERVO_VALUES.pivotEjectSamplePos);
                     }
 
                     // reset the position of the linear slide
@@ -1238,7 +1267,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         checkGTwoDDOWN = true;
                         checkGTwoA = true;
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
+                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
                     }
 
                     break;
@@ -1249,7 +1278,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        linearSlidePivot.setPower(-0.3);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlidePivot.setPower((-PIVOT_SPEED)*0.3);
                         isStateInitialized = true;
                     }
 
@@ -1261,11 +1291,14 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     }
 
 
-                    // EXIT
+                    // EXIT/ABORT
 
-                    // leave once pivot hits the switch
+                    // leave once pivot hits the switch (or told to exit manually)
                     // reset encoder position so pivot knows where it is and go to level mode
-                    if (resetSwitch) {
+                    if (resetSwitch ||
+                            (gamepad1.dpad_right && !checkGOneDRIGHT && gamepad1.x && !checkGOneX)) {
+                        checkGOneDRIGHT = true;
+                        checkGOneX = true;
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -1279,16 +1312,19 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 case RESET_PIVOT_LEVEL:
 
                     if (!isStateInitialized) {
+                        linearSlidePivot.setTargetPositionTolerance(3);
                         linearSlidePivot.setTargetPosition(PIVOT_CONSTANTS.resetLevelPos);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
-                        linearSlidePivot.setPower(PIVOT_SPEED);
+                        linearSlidePivot.setPower(PIVOT_SPEED*0.9);
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
 
                     // in case slide did not have time to fully retract
-                    if (isLinearSlideFullyRetracted(limitSwitch)) {
+                    if (isLinearSlideFullyRetracted(limitSwitch) && !isArmPositionSet) {
                         linearSlideLift.setPower(0);
+                        linearSlideLift.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideLift.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     }
 
@@ -1296,11 +1332,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     // EXIT
 
                     // go back to INTAKE_ACTIVE (normal functions) once arm has finished resetting
-                    if (Math.abs(pivotPosition - PIVOT_CONSTANTS.resetLevelPos) < 10 &&
+                    if (Math.abs(pivotPosition - PIVOT_CONSTANTS.resetLevelPos) < 5 &&
                         isArmPositionSet) {
                         linearSlidePivot.setPower(0);
                         linearSlidePivot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlidePivot.setTargetPositionTolerance(5); // default
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
                     }
@@ -1308,13 +1345,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
             // lower pivot slightly and reset position to 0
             // (if robot disconnected)
-                // TODO: remove once reset switch works
                 case MANUAL_LOWER_PIVOT:
                     telemetry.addLine("CURRENTLY ADJUSTING PIVOT");
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        manualPivotCheckpoint = (int)(pivotPosition - 150);
+                        manualPivotCheckpoint = (int)(pivotPosition - 100);
                         linearSlidePivot.setTargetPosition(manualPivotCheckpoint);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(-PIVOT_SPEED*0.5);
@@ -1347,13 +1383,12 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
             // lower pivot slightly and reset position to 0
             // (if robot disconnected)
-                // TODO: remove once reset switch works
                 case MANUAL_RAISE_PIVOT:
                     telemetry.addLine("CURRENTLY ADJUSTING PIVOT");
 
                     if (!isStateInitialized) {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        manualPivotCheckpoint = (int)(pivotPosition + 150);
+                        manualPivotCheckpoint = (int)(pivotPosition + 100);
                         linearSlidePivot.setTargetPosition(manualPivotCheckpoint);
                         linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         linearSlidePivot.setPower(PIVOT_SPEED*0.5);
@@ -1386,7 +1421,6 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
             // temporary pause of all function of the lift
             // (if robot disconnected)
-                // TODO: remove once reset switch works
                 case MANUAL_PIVOT_STASIS:
                     if (!limitSwitch) {
                         linearSlideLift.setPower(-0.4);
@@ -1394,6 +1428,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideLift.setPower(0);
                     }
                     telemetry.addLine("CURRENTLY ADJUSTING PIVOT");
+
+
+                    // EXIT
+
+                    // exit manual pivot adjustment when finished
+                    if (gamepad1.a && !checkGOneA) {
+                        checkGOneA = true;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
+                    }
+
                     break;
             }
 
@@ -1402,8 +1447,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
 // DRIVETRAIN ------------------------------------------------------------------------------------
 
-            // TODO: add april tag runner?
-
+            // TODO: add april tag runner (modify RobotVision class camera rotation offset)
 
             // set drive speed
             if (gamepad1.right_bumper && !checkGOneRB && driveSpeedIndex < driveSpeedRange.length-1) {
@@ -1417,8 +1461,25 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                 checkGOneLB = true;
             }
 
-            // assign power and set power
-            if (tankDrive) {
+            // check for AprilTag detections if told to do so
+            // runs to a tag if it found one, otherwise normal drivetrain control
+            // NOTE: button must be held to auto drive to tag
+            if (gamepad1.y) {
+                runningToBucketAprilTag = glasses.detectAprilTag(-1);
+            } else {
+                runningToBucketAprilTag = false;
+            }
+
+            // select correct drive and set power
+            if (runningToBucketAprilTag) {
+                // automatically position drivetrain to place in top bucket
+
+                glasses.driveToAprilTag(SENSOR_VARIABLES.glassesDistance,
+                        SENSOR_VARIABLES.glassesBearing,
+                        SENSOR_VARIABLES.glassesYaw,
+                        SENSOR_VARIABLES.glassesCameraAngle);
+
+            } else if (tankDrive) {
                 // tank mecanum drive
 
                 rightPower = -gamepad1.right_stick_y * driveSpeedFactor;
@@ -1453,9 +1514,11 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
 
             // TELEMETRY -----------------------------------------------------------
-            telemetry.addData("alternate deposit", alternateDeposit);
+            telemetry.addData("Duck Disabled", disableDuck);
             telemetry.addLine("RESET PIVOT: (gamepad 1) dpad_right + button_x");
             telemetry.addLine("MANUAL OVERRIDE: (gamepad 2) dpad_down + button_a");
+            telemetry.addLine("NOTE: to exit manual override, pivot position MUST be set");
+            telemetry.addLine("-------------------------");
 
             telemetry.addData("SLIDE STATE", linearSlideState);
             telemetry.addData("TIME", lightTimer.seconds());
@@ -1463,6 +1526,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("DRIVETRAIN");
+            telemetry.addData("Running to AprilTag", runningToBucketAprilTag);
             telemetry.addData("Front R POW", frontRight.getPower());
             telemetry.addData("Back R POW", backLeft.getPower());
             telemetry.addData("Front R POW", frontRight.getPower());
@@ -1485,13 +1549,19 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
             telemetry.addLine("SENSORS");
             telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
+            telemetry.addData("Reset Switch Activated", pivotResetSwitch.isPressed());
             telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
             telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
             telemetry.addLine("(operating range 1-10 centimeters)");
             telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
             telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
             telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+            telemetry.addLine("-------------------------");
 
+            if (glasses.hasAprilTag()) {
+                telemetry.addLine("VISION");
+                glasses.addAprilTagTelemetry();
+            }
 
             telemetry.update();
 
@@ -1524,7 +1594,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
 
     /**
-     * Determines what power to apply to the slides specified by the mode the lift is in.
+     * Determines what power to apply to the slides specified by the mode the lift is in. <br>
+     * Utilizes a cushion effect to prevent over-extension.
      * @param linearSlidePosition current position of the slide
      * @param intake use extension cushion for intake, or deposit
      * @return a correct and safe power that can be applied to the linear slide motor
@@ -1536,15 +1607,11 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         // determine the cushion for the linear slide so robot does not exceed extension limit
         if (intake) {
             // intake
-            linearSlideCushion = (SLIDE_CONSTANTS.extensionLimit - linearSlidePosition)
-                    /SLIDE_CONSTANTS.cushionRatio;
-        } else if (alternateDeposit) {
-            // angled deposit
-            linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeightAlternate - linearSlidePosition)
+            linearSlideCushion = (SLIDE_CONSTANTS.extensionLimitIntake - linearSlidePosition)
                     /SLIDE_CONSTANTS.cushionRatio;
         } else {
-            // vertical deposit
-            linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeight - linearSlidePosition)
+            // alternate deposit
+            linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeightAlternate - linearSlidePosition)
                     /SLIDE_CONSTANTS.cushionRatio;
         }
 
@@ -1572,7 +1639,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
 
     /**
-     * Prevents pivot from bending the robot in half and exceeding the extension limit
+     * Prevents pivot from bending the robot in half and exceeding the extension limit <br>
      * when running the pivot manually
      * @param pivotPosition current position of the pivot
      * @return a power suitable for safe pivot use
@@ -1600,7 +1667,9 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     }
 
 
-
+    /**
+     * Initializes all hardware needed to begin teleop
+     */
     public void initHardware() {
 
         // HARDWARE CONFIGURATION
@@ -1615,6 +1684,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         intakeWheelR = hardwareMap.get(CRServo.class, "intakeWheelR");
         intakeWheelL = hardwareMap.get(CRServo.class, "intakeWheelL");
         intakePivot = hardwareMap.get(Servo.class, "intakePivot");
+
+        duckSpinner = hardwareMap.get(CRServo.class, "duckSpinner");
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
@@ -1638,7 +1709,24 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         intakeWheelL.setDirection(DcMotorSimple.Direction.REVERSE);
 
+        // normally enabled
+        if (camera) {
+            glasses = new RobotVision(hardwareMap, telemetry, true, false);
 
+//            while (!isStopRequested() && !glasses.isCameraInitialized()) {
+//                telemetry.addData("Camera", "Waiting");
+//                telemetry.update();
+//            }
+//
+//            try {
+//                glasses.setManualExposure(12, 200);
+//            } catch (InterruptedException | FailedInitializationException e) {
+//                telemetry.addLine("--------------------------------");
+//                telemetry.addLine(e.getMessage());
+//                telemetry.addLine("--------------------------------");
+//            }
+
+        }
 
     }
 
