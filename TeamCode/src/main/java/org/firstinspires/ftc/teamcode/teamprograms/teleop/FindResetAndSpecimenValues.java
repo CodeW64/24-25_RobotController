@@ -5,13 +5,15 @@ import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 
-@TeleOp(group = "Z")
+@TeleOp(group = "AAA")
 public class FindResetAndSpecimenValues extends LinearOpMode {
 
     DcMotorEx linearSlideLift, linearSlidePivot;
     TouchSensor linearSlideSwitch, pivotResetSwitch;
+    Servo intakePivot;
 
     final int PIVOT_SPECIMEN_POSITION = 2300;
 
@@ -35,12 +37,16 @@ public class FindResetAndSpecimenValues extends LinearOpMode {
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
         pivotResetSwitch = hardwareMap.get(TouchSensor.class, "pivotResetSwitch");
 
+        intakePivot = hardwareMap.get(Servo.class, "intakePivot");
+
         boolean isStateInitialized = false;
         boolean isArmPositionSet = false;
 
         boolean checkGOneDRIGHT = false;
         boolean checkGOneX = false;
         boolean checkGOneB = false;
+
+        intakePivot.setPosition(0.52);
 
         telemetry.addLine("Press Start");
         telemetry.update();

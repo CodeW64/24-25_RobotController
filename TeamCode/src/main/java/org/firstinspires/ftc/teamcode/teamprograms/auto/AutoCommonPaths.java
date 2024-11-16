@@ -393,7 +393,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
             // Move to the spike mark using only odometry
             final Pose2d spikeTag = getTagPoseFromId(fallBackId);
             lineTo(globalDrive, new Pose2d(
-                spikeTag.position.x + centerOffset, 
+                spikeTag.position.x + centerOffset + 2,
                 spikeTag.position.y - distFrom * Math.signum(centerOffset),
                 spikeTag.heading.toDouble()
             ));

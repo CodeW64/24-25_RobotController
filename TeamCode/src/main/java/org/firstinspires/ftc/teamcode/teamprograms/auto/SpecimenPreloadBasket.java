@@ -903,12 +903,16 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         timer = timeSection("chamber_inital");
         globalDrive.updatePoseEstimate();
         // globalDrive.maxWheelVel = 25;
-        if(!arg) {
+//        if(!arg) {
+//        moveAndPlaceSpecimen();
+//        switchArmAsync(); // Lowring the arm
+//        // globalDrive.maxWheelVel = 40;
+//        logTime(timer);
+//        }
         moveAndPlaceSpecimen();
         switchArmAsync(); // Lowring the arm
         // globalDrive.maxWheelVel = 40;
         logTime(timer);
-        }
         // if(arg) {
         //     return;
         // }
@@ -964,7 +968,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             globalDrive.updatePoseEstimate();
 
             timer = timeSection("move_zone_" + (3 - i));
-            final double DIST_BACK = 6;
+            final double DIST_BACK = 9;
             final double SQRT2 = Math.sqrt(2);
             final Pose2d BACK_AWAY = new Pose2d(DIST_BACK / SQRT2, -DIST_BACK / SQRT2, 0); // don't go too close to the buckets
             setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging

@@ -136,7 +136,7 @@ public class AutoArmRunner extends LinearOpMode {
     final int PIVOT_MIN_POSITION = 0;
     final int PIVOT_ALTERNATE_DEPOSIT_POSITION = 2850;
     final int PIVOT_ALTERNATE_RETRACT_SET_POSITION = 3200;
-    final int PIVOT_CHAMBER = 1800;
+    final int PIVOT_CHAMBER = 1900;
     final int PIVOT_HANG_SPECIMEN = 1500;
 
 
@@ -450,7 +450,7 @@ public class AutoArmRunner extends LinearOpMode {
 
                         // Driving the pivot the the target with the given power and tolerance
                         linearSlidePivot.setTargetPosition(PIVOT_CHAMBER); // Used only to interface with older code
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         isIntakeProtected = true;
                         // isArmPositionSet = false;
                         isArmPositionSet = true;
@@ -479,6 +479,7 @@ public class AutoArmRunner extends LinearOpMode {
                             PIVOT_TOLERANCE, 
                             pivotReverseFactor * PIVOT_SPEED
                         );
+                        linearSlidePivot.setPower(PIVOT_SPEED);
                     }
 
                     // ABORT
@@ -850,8 +851,8 @@ public class AutoArmRunner extends LinearOpMode {
                     // (and once slide has finished retracting)
                     if (Math.abs(pivotPosition-linearSlidePivot.getTargetPosition()) < PIVOT_TOLERANCE &&
                         isArmPositionSet) {
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         linearSlidePivot.setPower(0);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isStateInitialized = false;
                         pivotReverseFactor = 1; // Reset the factor 
 
@@ -861,13 +862,14 @@ public class AutoArmRunner extends LinearOpMode {
                             linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
                         }
                     } else {
-                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlidePivot.setMode(DcMotor.RunMode.RUN_TO_POSITION);
                         pivotReverseFactor *= AutoInit.driveMotorToIterative(
                             linearSlidePivot, 
                             linearSlidePivot.getTargetPosition(), 
                             PIVOT_TOLERANCE, 
                             pivotReverseFactor * PIVOT_SPEED
                         );
+                        linearSlidePivot.setPower(PIVOT_SPEED);
                     }
 
                     // ABORT
