@@ -5,6 +5,7 @@ import androidx.annotation.NonNull;
 import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.Actions;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.HardwareMap;
@@ -246,6 +247,7 @@ public class RobotVision {
         return targetFound;
     }
 
+    @Deprecated
     public boolean isAprilTagOnTarget(double desiredDistance) {
         double rangeError = desiredTag.ftcPose.range-desiredDistance;
         double bearingError = desiredTag.ftcPose.bearing;
@@ -260,8 +262,27 @@ public class RobotVision {
     }
 
     /**
-     * Used in Autonomous only
+     * Checks if the robot is within tolerance of positioning relative to April Tag <br>
+     * Used for autonomous
+     * @param desiredDistance offset distance from 0
+     * @param desiredBearing offset bearing from 0
+     * @param desiredYaw offset yaw from 0
+     * @return if robot is on target or should continue adjusting
      */
+    public boolean isAprilTagOnTarget(double desiredDistance, double desiredBearing, double desiredYaw) {
+        double rangeError = desiredTag.ftcPose.range-desiredDistance;
+        double bearingError = desiredTag.ftcPose.bearing-desiredBearing;
+        double yawError = desiredTag.ftcPose.yaw-desiredYaw;
+
+        // tolerances for April tag positioning can be modified here
+        if (Math.abs(rangeError) < 1 && Math.abs(bearingError) < 2 && Math.abs(yawError) < 2) {
+            return true; // on target and within tolerances
+        } else {
+            return false; // does not meet tolerance requirements
+        }
+    }
+
+
     @Deprecated
     public void search(Direction direction, double power) {
 
@@ -283,7 +304,7 @@ public class RobotVision {
     }
 
     /**
-     * Used in Autonomous only
+     * Used in autonomous only, slowly turns robot in given direction to find April Tag
      */
     public void search(Direction direction) {
         double power = 0.2;
@@ -419,16 +440,11 @@ public class RobotVision {
         double rotX = x * Math.cos(-driveHeading) - y * Math.sin(-driveHeading);
         double rotY = x * Math.sin(-driveHeading) + y * Math.cos(-driveHeading);
 
+        // Calculate wheel powers.
         double leftFrontPower    =  rotX -rotY -yaw;
         double rightFrontPower   =  rotX +rotY +yaw;
         double leftBackPower     =  rotX +rotY -yaw;
         double rightBackPower    =  rotX -rotY +yaw;
-
-        // Calculate wheel powers.
-        /*double leftFrontPower    =  x -y -yaw;
-        double rightFrontPower   =  x +y +yaw;
-        double leftBackPower     =  x +y -yaw;
-        double rightBackPower    =  x -y +yaw;*/
 
         // Normalize wheel powers to be less than 1.0
         double max = Math.max(Math.abs(leftFrontPower), Math.abs(rightFrontPower));
@@ -452,7 +468,7 @@ public class RobotVision {
 
 
     /**
-     * Used for Autonomous
+     * Used for autonomous, stops drive motors when April Tag action is finished
      */
     public void stopDrivetrain() {
         leftFrontDrive.setPower(0);
@@ -554,6 +570,7 @@ public class RobotVision {
     /**
      * NOTE: THIS ACTION UTILIZES THE DRIVETRAIN! Do not use with parallel actions alongside RR trajectories!
      */
+    @Deprecated
     public Action runAprilTagAction(int tagID, double offsetDistance, Direction direction) {
         return new Action() {
             private final int givenTagID = tagID;
@@ -598,6 +615,73 @@ public class RobotVision {
 
         }; // end action class
     }
+
+
+    /**
+     * NOTE: THIS ACTION UTILIZES THE DRIVETRAIN! Do not use with parallel actions alongside RR trajectories!
+     */
+    public Action runAprilTagAction(
+            int tagID,
+            double offsetDistance, double offsetBearing, double offsetYaw, double cameraAngle,
+            Direction direction) {
+
+        return new Action() {
+            private final int givenTagID = tagID;
+            private final double givenDistance = offsetDistance;
+            private final double givenBearing = offsetBearing;
+            private final double givenYaw = offsetYaw;
+            private final double givenCameraAngle = cameraAngle;
+            private final Direction givenDirection = direction;
+            private double startTime;
+            private boolean initialized = false;
+
+            @Override
+            public boolean run(@NonNull TelemetryPacket packet) {
+
+                if (!initialized) {
+                    startTime = Actions.now();
+                    initialized = true;
+                }
+
+                // get current runtime of action between checks of isAprilTagOnTarget(...)
+                double t = Actions.now() - startTime;
+
+
+
+                if (!detectAprilTag(givenTagID)) {
+                    search(givenDirection);
+
+                } else {
+                    driveToAprilTag(
+                            givenDistance,
+                            givenBearing,
+                            givenYaw,
+                            givenCameraAngle
+                    );
+
+                    // check if robot is where it is supposed to be and has been
+                    // given enough time for slowdown and position correction;
+                    // if so, give control of the drivetrain back to RR
+                    // and end the action
+                    boolean onTarget = isAprilTagOnTarget(
+                            givenDistance,
+                            givenBearing,
+                            givenYaw
+                    );
+                    if (onTarget && t > 2) {
+                        stopDrivetrain();
+                        return false;
+                    } else if (!onTarget){
+                        startTime = Actions.now(); // reset timer
+                    }
+                }
+
+                return true;
+
+            } // end run method
+
+        }; // end action class
+    } // end action creation method
 
 
 
