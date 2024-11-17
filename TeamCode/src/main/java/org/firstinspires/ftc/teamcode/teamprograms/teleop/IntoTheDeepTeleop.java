@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 1.4.0 RELEASE
+ * Teleop Version: 1.5.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -261,14 +261,14 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         while (opModeInInit()) {
 
             // change drive mode
-            if (gamepad1.a) {
+            if (gamepad1.right_bumper) {
                 tankDrive = true;
-            } else if (gamepad1.b) {
+            } else if (gamepad1.left_bumper) {
                 tankDrive = false;
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 1.4.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 1.5.0 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
