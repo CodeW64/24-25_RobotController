@@ -81,5 +81,5 @@ lint/tmp/
 # lint/reports/
 
 # Other
-MeepMeepGui/
+MeepMeepGui/*
 MeepMeepGui/src/main/java/com/example/meepmeeptesting/MeepMeepTesting.java
