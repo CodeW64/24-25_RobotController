@@ -54,6 +54,9 @@ public class BasketPathTestSingleThread extends LinearOpMode {
         TranslationalVelConstraint velocitySlow = new TranslationalVelConstraint(25);
         ProfileAccelConstraint accelerationSlow = new ProfileAccelConstraint(-25, 25);
 
+        TranslationalVelConstraint velocityNormal = new TranslationalVelConstraint(35);
+        ProfileAccelConstraint accelerationNormal = new ProfileAccelConstraint(-30, 30);
+
         // roadrunner 1.0 is quite different, first up is creation of trajectories
 
         // move to hang specimen
@@ -61,34 +64,35 @@ public class BasketPathTestSingleThread extends LinearOpMode {
                 .lineToYConstantHeading(-36);
 
         // move to sample spike mark 1 (from specimen position)
-        TrajectoryActionBuilder trajectory2 = trajectory1.fresh()
+        TrajectoryActionBuilder trajectory2 = trajectory1.endTrajectory().fresh()
                 .setReversed(true)
                 .splineToConstantHeading(new Vector2d(-36, -48), Math.toRadians(180))
                 .splineToConstantHeading(new Vector2d(-48, -36), Math.toRadians(90));
 
         // move to basket (from spike mark 1 position)
-        TrajectoryActionBuilder trajectory3 = trajectory2.fresh()
+        TrajectoryActionBuilder trajectory3 = trajectory2.endTrajectory().fresh()
                 .setReversed(true)
 //                .splineToLinearHeading(new Pose2d(-54, 54, Math.toRadians(180)), Math.toRadians(180))
                 .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
                         velocitySlow, accelerationSlow);
 
         // move to sample spike mark 2 (from basket)
-        TrajectoryActionBuilder trajectory4 = trajectory3.fresh()
+        TrajectoryActionBuilder trajectory4 = trajectory3.endTrajectory().fresh()
                 .setReversed(true)
                 .splineToSplineHeading(new Pose2d(-60, -36, Math.toRadians(90)), Math.toRadians(180));
 
         // move to basket (from spike mark 2 position)
-        TrajectoryActionBuilder trajectory5 = trajectory4.fresh()
+        TrajectoryActionBuilder trajectory5 = trajectory4.endTrajectory().fresh()
                 .setReversed(true)
                 .setTangent(Math.toRadians(0))
                 .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
                         velocitySlow, accelerationSlow);
 
         // go get a level 1 ascent (from basket)
-        TrajectoryActionBuilder trajectory6 = trajectory5.fresh()
+        TrajectoryActionBuilder trajectory6 = trajectory5.endTrajectory().fresh()
                 .setReversed(true)
-                .splineToSplineHeading(new Pose2d(-48, -24, Math.toRadians(0)), Math.toRadians(90))
+                .splineToSplineHeading(new Pose2d(-48, -24, Math.toRadians(0)), Math.toRadians(90),
+                        velocityNormal, accelerationNormal)
                 .splineToConstantHeading(new Vector2d(-24, -12), Math.toRadians(0));
 
 
