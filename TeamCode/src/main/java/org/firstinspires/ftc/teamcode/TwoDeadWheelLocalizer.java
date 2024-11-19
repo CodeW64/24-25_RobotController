@@ -27,10 +27,12 @@ public final class TwoDeadWheelLocalizer implements Localizer {
     public static class Params {
 
         // 30 = 2004.5
-        public double parYTicks = 2164.32527311559; // y position of the parallel encoder (in tick units)
+        public double parYTicks = 2150.4; // y position of the parallel encoder (in tick units)
+        // 2150.4
 
         // 30 = 130.1
-        public double perpXTicks = -183.9643549844739; // x position of the perpendicular encoder (in tick units)
+        public double perpXTicks = -326.8; // x position of the perpendicular encoder (in tick units)
+        // -326.8
 
         // used to correct IMU inaccuracy when turning multiple times in the same direction
         // adjust as needed
