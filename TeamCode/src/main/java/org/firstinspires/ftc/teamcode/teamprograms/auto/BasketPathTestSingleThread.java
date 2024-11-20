@@ -73,8 +73,9 @@ public class BasketPathTestSingleThread extends LinearOpMode {
         TrajectoryActionBuilder trajectory3 = trajectory2.endTrajectory().fresh()
                 .setReversed(true)
 //                .splineToLinearHeading(new Pose2d(-54, 54, Math.toRadians(180)), Math.toRadians(180))
-                .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
-                        velocitySlow, accelerationSlow);
+//                .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
+//                        velocitySlow, accelerationSlow);
+        .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225));
 
         // move to sample spike mark 2 (from basket)
         TrajectoryActionBuilder trajectory4 = trajectory3.endTrajectory().fresh()
@@ -85,14 +86,16 @@ public class BasketPathTestSingleThread extends LinearOpMode {
         TrajectoryActionBuilder trajectory5 = trajectory4.endTrajectory().fresh()
                 .setReversed(true)
                 .setTangent(Math.toRadians(0))
-                .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
-                        velocitySlow, accelerationSlow);
+//                .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225),
+//                        velocitySlow, accelerationSlow);
+                .splineToSplineHeading(new Pose2d(-54, -54, Math.toRadians(225)), Math.toRadians(225));
 
         // go get a level 1 ascent (from basket)
         TrajectoryActionBuilder trajectory6 = trajectory5.endTrajectory().fresh()
                 .setReversed(true)
-                .splineToSplineHeading(new Pose2d(-48, -24, Math.toRadians(0)), Math.toRadians(90),
-                        velocityNormal, accelerationNormal)
+//                .splineToSplineHeading(new Pose2d(-48, -24, Math.toRadians(0)), Math.toRadians(90),
+//                        velocityNormal, accelerationNormal)
+                .splineToSplineHeading(new Pose2d(-48, -24, Math.toRadians(0)), Math.toRadians(90))
                 .splineToConstantHeading(new Vector2d(-24, -12), Math.toRadians(0));
 
 
