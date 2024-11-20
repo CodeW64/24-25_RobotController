@@ -92,10 +92,10 @@ public final class MecanumDrive {
         public double maxWheelVel = 50; // 35
 
         // 30 = -30
-        public double minProfileAccel = -20; // -30
+        public double minProfileAccel = -30; // -30
 
         // 30 = 30
-        public double maxProfileAccel = 20; // 30
+        public double maxProfileAccel = 30; // 30
 
         // turn profile parameters (in radians)
 
@@ -116,8 +116,8 @@ public final class MecanumDrive {
         // 30 = 3.0
         public double headingGain = 5.0; // shared with turn
 
-        public double axialVelGain = 0.0;
-        public double lateralVelGain = 0.0;
+        public double axialVelGain = 1.0;
+        public double lateralVelGain = 1.0;
         public double headingVelGain = 0.0; // shared with turn
     }
 
