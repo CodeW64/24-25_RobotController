@@ -80,6 +80,7 @@ public class AutoArmRunner extends LinearOpMode {
     protected DcMotorEx linearSlideLift, linearSlidePivot;
     protected CRServo intakeWheelR, intakeWheelL;
     protected Servo intakePivot;
+    protected CRServo duckSpinner;
 
     protected ColorRangeSensor sampleSensor;
     protected TouchSensor linearSlideSwitch, pivotResetSwitch;
@@ -99,6 +100,15 @@ public class AutoArmRunner extends LinearOpMode {
     final double INTAKE_POWER_HOLD = 0.06;
     final double INTAKE_POWER_EMPTY = -0.3;
     final double INTAKE_POWER_ZERO = 0;
+    
+    // DUCK VALUES (editable by FTC dashboard)
+    public static class DuckValues {
+        public double spinStop = -0.0;
+        public double spinRest = -0.15;
+        public double spinActive = -0.3;
+        public double spinHyperActive = -0.5;
+    }
+    public static DuckValues DUCK_VALUES = new DuckValues();
 
 
     // SENSOR VARIABLES (editable by FTC dashboard)
@@ -167,6 +177,7 @@ public class AutoArmRunner extends LinearOpMode {
     private double pivotReverseFactor = 1; // Set AutoInit.driveMotorToIterative
 
     boolean tankDrive = true;
+    boolean disableDuck = false;
 
     boolean alternateDeposit = true;
 
@@ -369,6 +380,7 @@ public class AutoArmRunner extends LinearOpMode {
                 case INTAKE_ACTIVE:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
@@ -621,6 +633,8 @@ public class AutoArmRunner extends LinearOpMode {
                 case INTAKE_FULL:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinActive);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         isIntakeProtected = true;
                         intakeWheelR.setPower(INTAKE_POWER_HOLD);
@@ -973,6 +987,8 @@ public class AutoArmRunner extends LinearOpMode {
                 case DEPOSIT_ALTERNATE_ACTIVE:
 
                     if (!isStateInitialized) {
+                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinHyperActive);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         isIntakeProtected = true;
                         intakeWheelR.setPower(INTAKE_POWER_HOLD);
@@ -1700,6 +1716,8 @@ public class AutoArmRunner extends LinearOpMode {
         intakeWheelR = hardwareMap.get(CRServo.class, "intakeWheelR");
         intakeWheelL = hardwareMap.get(CRServo.class, "intakeWheelL");
         intakePivot = hardwareMap.get(Servo.class, "intakePivot");
+
+        duckSpinner = hardwareMap.get(CRServo.class, "duckSpinner");
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");

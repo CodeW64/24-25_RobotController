@@ -129,7 +129,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimitIntake = 2400;
+        public double extensionLimitIntake = 1750;
         public double extensionLimitHang = 3800;
         public double cushionRatio = 400;
         public double topBucketHeightAlternate = 4200;
@@ -141,7 +141,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     public static class PivotConstants {
         public double cushionRatio = 400;
         public int resetLevelPos = 90; // 435 RPM = 70 | 312 RPM = 100
-        public int hangPos = 3700; // 435 RPM = 2700 | 312 RPM = 3700
+        public int hangPos = 3625; // 435 RPM = 2700 | 312 RPM = 3700
         public int attemptSamplePos = 70; // 435 RPM = 50 | 312 RPM = 100
 
     }

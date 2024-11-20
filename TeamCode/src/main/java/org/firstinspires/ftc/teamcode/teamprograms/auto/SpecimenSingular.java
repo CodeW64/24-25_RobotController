@@ -46,8 +46,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
  * 
  * @author Connor Larson
  */
-@Autonomous(name="Basket Placer (Preloaded Specimen)")
-public class SpecimenPreloadBasket extends AutoCommonPaths {
+@Autonomous(name="Single Specimen")
+public class SpecimenSingular extends AutoCommonPaths {
     private boolean isBlue = true;
     private boolean shouldParkObservation = true; // False: Go to ascent zone there
     private int neutralTagId = AprilLocater.NEUTRAL_BLUE_ID;
@@ -81,7 +81,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      */
     private final Pose2d START_LOCATION = new Pose2d(
         -72 + ROBOT_CENTER.position.x, // -72 is the left grid x-coord 
-         24 - ROBOT_CENTER.position.y, //  0 is the top y-coord
+        -24 + ROBOT_CENTER.position.y, //  0 is the top y-coord
          0  + ROBOT_CENTER.heading.toDouble() // 0 is the deafult rotation
     );
 
@@ -826,7 +826,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         final Pose2d currentPos = getCurrentPosition();
         final Pose2d dest = new Pose2d(
             BLUE_CHAMBER.position.x - SAFETY_DIST, 
-            BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y + ALLIANCE_SHARING_DIST, 
+            BLUE_CHAMBER.position.y - ROBOT_CENTER.position.y - ALLIANCE_SHARING_DIST, 
             0
         );
         Actions.runBlocking(globalDrive.actionBuilder(currentPos)
@@ -917,124 +917,119 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // if(arg) {
         //     return;
         // }
+        // Parking for 3 points
+        lineTo(globalDrive, new Vector2d(-60, -60));
 
         // Driving to the spike marks
-        boolean isFirstSpikeSample = true;
-        for(int i = 2; i >= 1 && opModeIsActive(); i--) {
-            // Initial positioning data
-            final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(-20, 0, 0);
+        // boolean isFirstSpikeSample = true;
+        // for(int i = 2; i >= 1 && opModeIsActive(); i--) {
+        //     // Initial positioning data
+        //     final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
+        //     final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
+        //     final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
+        //     final Pose2d grabbingDistance = new Pose2d(-20, 0, 0);
             
-            // Finding the offset
-            final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
-            final Vector2d[] rotationMatrix = {
-                // __          __ 
-                // |  M11  M12  | 
-                // |_ M21  M22 _| 
-                new Vector2d(/*M11*/Math.cos(extraRotation),  /*M21*/Math.sin(extraRotation)),
-                new Vector2d(/*M12*/-Math.sin(extraRotation), /*M22*/Math.cos(extraRotation))
-            };
-            final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
-            final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+        //     // Finding the offset
+        //     final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
+        //     final Vector2d[] rotationMatrix = {
+        //         // __          __ 
+        //         // |  M11  M12  | 
+        //         // |_ M21  M22 _| 
+        //         new Vector2d(/*M11*/Math.cos(extraRotation),  /*M21*/Math.sin(extraRotation)),
+        //         new Vector2d(/*M12*/-Math.sin(extraRotation), /*M22*/Math.cos(extraRotation))
+        //     };
+        //     final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
+        //     final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
             
-            // Moving to grab the sample
-            setDestinationOffset(finalOffset); // Puts the robot into grabbing position
-            globalDrive.updatePoseEstimate();
-            telemetry.addLine("\n=====> Moving to the spike mark...");
-            telemetry.update();
-            isTime = true;
-            setRotationType(RotationType.SPLINE);
-            moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
-
-            // if(getCurrentPosition().heading.toDouble()) {
-
-            // }
-
-            // Grabbing the pixel
-            resetDestinationOffset();
-            timer = timeSection("grab_sample_" + (3 - i));
-            telemetry.addLine("\n=====> Grabbing the sample...");
-            telemetry.update();
-            grabSampleSync(false); // Grab the pixel. and retract
-            logTime(timer);
-            isTime = false;
-
-            timer = timeSection("retract_sync_" + (3 - i));
-            retractSync();
-            // lift.waitForFinish();
-            logTime(timer);
-
-            timer = timeSection("switch_arm_" + (3 - i));
-            switchArmAsync(); // Switch the arm up; completed by travel time
-            logTime(timer);
-            
-            // Scoring!
-            globalDrive.updatePoseEstimate();
-
-            timer = timeSection("move_zone_" + (3 - i));
-            final double DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
-            final double DIST_BACK = 9.5 - DIST_INCREMENT * (2 - i);
-            final double DIST_STRAFE = 2.5;            
-            final double SQRT2 = Math.sqrt(2);
-            final Pose2d BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
-            setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
-            moveRobotToNetZone(isBlue);
-            resetDestinationOffset();
-            logTime(timer);
-
-            
-            // Waiting for the pivot to get up before extendning
-            // final double PIVOT_BUCKET_SAFETY = (PIVOT_ALTERNATE_DEPOSIT_POSITION + PIVOT_MIN_POSITION) / 2;
-            lift.waitForSwitch();
-            
-            // Extending to the buckets
-            timer = timeSection("arm_raise_" + (3 - i));
-            extendToBucketsSync();
-            lift.waitForFinish();
-            logTime(timer);
-
-            // timer = timeSection("move_forward_" + (3 - i));
-            // netMoveSync(8); // inches 
-            // logTime(timer);
-            
-            timer = timeSection("berrideden_of_sample_" + (3 - i));
-            berriddenOfSample();
-            logTime(timer);
-        }
-
-        // Retracting fully after the last basket
-        driveMotorTo(linearSlideLift, 0, 10, -SLIDE_SPEED);
-
-        // lift.close();
-
-        // telemetry.clearAll();
-        telemetry.addLine(accumulated);
-        telemetry.update();
-
-        // // Parking
-        // telemetry.addData("Status", "Completed!");
-        // telemetry.update();
-
-        // final AprilTagDetection observationZone = getDetection(this.coloredTagId);
-        // if(this.shouldParkObservation) {
+        //     // Moving to grab the sample
+        //     setDestinationOffset(finalOffset); // Puts the robot into grabbing position
         //     globalDrive.updatePoseEstimate();
-        //     moveRobotToObservation(observationZone, false); 
-        // } else {
+        //     telemetry.addLine("\n=====> Moving to the spike mark...");
+        //     telemetry.update();
+        //     isTime = true;
+        //     moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
+
+        //     // Grabbing the pixel
+        //     resetDestinationOffset();
+        //     timer = timeSection("grab_sample_" + (3 - i));
+        //     telemetry.addLine("\n=====> Grabbing the sample...");
+        //     telemetry.update();
+        //     grabSampleSync(false); // Grab the pixel. and retract
+        //     logTime(timer);
+        //     isTime = false;
+
+        //     timer = timeSection("retract_sync_" + (3 - i));
+        //     retractSync();
+        //     // lift.waitForFinish();
+        //     logTime(timer);
+
+        //     timer = timeSection("switch_arm_" + (3 - i));
+        //     switchArmAsync(); // Switch the arm up; completed by travel time
+        //     logTime(timer);
+            
+        //     // Scoring!
         //     globalDrive.updatePoseEstimate();
-        //     moveRobotToAscentZone(observationZone);
-        //     globalDrive.updatePoseEstimate();
-        //     attemptAscent(1);
+
+        //     timer = timeSection("move_zone_" + (3 - i));
+        //     final double DIST_BACK = 9;
+        //     final double SQRT2 = Math.sqrt(2);
+        //     final Pose2d BACK_AWAY = new Pose2d(DIST_BACK / SQRT2, -DIST_BACK / SQRT2, 0); // don't go too close to the buckets
+        //     setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
+        //     moveRobotToNetZone(isBlue);
+        //     resetDestinationOffset();
+        //     logTime(timer);
+
+            
+        //     // Waiting for the pivot to get up before extendning
+        //     // final double PIVOT_BUCKET_SAFETY = (PIVOT_ALTERNATE_DEPOSIT_POSITION + PIVOT_MIN_POSITION) / 2;
+        //     lift.waitForSwitch();
+            
+        //     // Extending to the buckets
+        //     timer = timeSection("arm_raise_" + (3 - i));
+        //     extendToBucketsSync();
+        //     lift.waitForFinish();
+        //     logTime(timer);
+
+        //     // timer = timeSection("move_forward_" + (3 - i));
+        //     // netMoveSync(8); // inches 
+        //     // logTime(timer);
+            
+        //     timer = timeSection("berrideden_of_sample_" + (3 - i));
+        //     berriddenOfSample();
+        //     logTime(timer);
         // }
 
-        // Putting the arm at position zero for the teleop folks
-        gamepad1.dpad_left = true;
-        gamepad2.dpad_left = true;
+        // // Retracting fully after the last basket
+        // driveMotorTo(linearSlideLift, 0, 10, -SLIDE_SPEED);
 
-        // Yipee! Finishing up
-        telemetry.addData("Status", "Completed! 🥳");
-        telemetry.update();
+        // // lift.close();
+
+        // // telemetry.clearAll();
+        // telemetry.addLine(accumulated);
+        // telemetry.update();
+
+        // // // Parking
+        // // telemetry.addData("Status", "Completed!");
+        // // telemetry.update();
+
+        // // final AprilTagDetection observationZone = getDetection(this.coloredTagId);
+        // // if(this.shouldParkObservation) {
+        // //     globalDrive.updatePoseEstimate();
+        // //     moveRobotToObservation(observationZone, false); 
+        // // } else {
+        // //     globalDrive.updatePoseEstimate();
+        // //     moveRobotToAscentZone(observationZone);
+        // //     globalDrive.updatePoseEstimate();
+        // //     attemptAscent(1);
+        // // }
+
+        // // Putting the arm at position zero for the teleop folks
+        // gamepad1.dpad_left = true;
+        // gamepad2.dpad_left = true;
+
+        // // Yipee! Finishing up
+        // telemetry.addData("Status", "Completed! 🥳");
+        // telemetry.update();
     }
     // private void main(boolean arg) throws InterruptedException {
     //     lift.start();

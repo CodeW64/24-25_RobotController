@@ -395,7 +395,8 @@ abstract public class AutoCommonPaths extends AprilLocater {
             lineTo(globalDrive, new Pose2d(
                 spikeTag.position.x + centerOffset + 2,
                 spikeTag.position.y - distFrom * Math.signum(centerOffset),
-                spikeTag.heading.toDouble()
+                // spikeTag.heading.toDouble()
+                Math.toRadians(90)
             ));
             return;
         }
