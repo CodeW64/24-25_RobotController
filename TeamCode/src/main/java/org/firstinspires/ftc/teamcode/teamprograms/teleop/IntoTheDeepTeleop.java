@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 1.5.0 RELEASE
+ * Teleop Version: 1.6.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -80,6 +80,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     // HARDWARE
     DcMotorEx frontRight, backRight, frontLeft, backLeft;
     DcMotorEx linearSlideLift, linearSlidePivot;
+    DcMotorEx linearActuatorRight, linearActuatorLeft;
     CRServo intakeWheelR, intakeWheelL;
     Servo intakePivot;
     CRServo duckSpinner;
@@ -154,6 +155,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     final int PIVOT_DEPOSIT_POSITION = 2850; // 435 RPM = 2050 | 312 RPM = 2850
     final int PIVOT_DEPOSIT_RETRACT_SET_POSITION = 3200; // 435 RPM = 2300 | 312 RPM = 3200
 
+    public static class ActuatorConstants {
+        public int minPos = 0;
+        public int maxPos = 1500; // change
+        public int hangPos = 500; // change
+    }
+    public static ActuatorConstants ACTUATOR_CONSTANTS = new ActuatorConstants();
+
 
 
 
@@ -170,8 +178,14 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         MANUAL_OVERRIDE, MANUAL_LOWER_PIVOT, MANUAL_RAISE_PIVOT, MANUAL_PIVOT_STASIS,
         RESET_PIVOT_LOWER, RESET_PIVOT_LEVEL
     }
-
     LinearSlideStates linearSlideState;
+
+    enum ActuatorHangStates {
+        HANDS_UP, HANDS_DOWN,
+        HANDS_AT_REST,
+        HANDS_RESET
+    }
+    ActuatorHangStates actuatorHangState;
 
     ElapsedTime lightTimer;
 
@@ -179,11 +193,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     // constant variables
     final double SLIDE_SPEED = 0.9; // was 0.5
     final double PIVOT_SPEED = 1.0;
+    final double ACTUATOR_SPEED = 1.0;
 
     boolean tankDrive = true;
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
     boolean camera = true; // disable if camera not in use or if it doesn't exist
+    boolean isRobot2ndLevelAscending = false;
 
 
     int manualPivotCheckpoint = 0; // used for manual lowering/raising of slide pivot for reset
@@ -232,6 +248,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         boolean checkGTwoY = true;
 
         boolean checkGTwoDUP = true;
+        boolean checkGTwoDLEFT = true;
 
         boolean checkGOneDDOWN = true;
         boolean checkGOneDUP = true;
@@ -253,6 +270,9 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         boolean isIntakeProtected = false;
         boolean isArmPositionSet = true;
 
+        // ACTUATOR STATE MACHINE LOGIC
+        boolean isActuatorStateInitialized = false;
+
         // WAIT LOOP ----------------------------------------------------------------------------
 
         lightTimer.startTime();
@@ -268,7 +288,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 1.5.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 1.6.0 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
@@ -282,6 +302,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         lightTimer.reset();
         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
+        actuatorHangState = ActuatorHangStates.HANDS_UP;
 
 
 
@@ -307,6 +328,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             if (!gamepad2.y) checkGTwoY = false;
 
             if (!gamepad2.dpad_up) checkGTwoDUP = false;
+            if (!gamepad2.dpad_left) checkGTwoDLEFT = false;
 
             if (!gamepad1.dpad_down) checkGOneDDOWN = false;
             if (!gamepad1.dpad_up) checkGOneDUP = false;
@@ -880,12 +902,13 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
                     }
 
-                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                    // go hang (OLD)
+                    /*if (gamepad2.dpad_up && !checkGTwoDUP) {
                         checkGTwoDUP = true;
                         linearSlideLift.setPower(0);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_HANG_TIME;
-                    }
+                    }*/
 
                     break;
 
@@ -1442,12 +1465,133 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     break;
             }
 
+// LINEAR ACTUATORS ------------------------------------------------------------------------------
+
+            switch (actuatorHangState) {
+            // move grips up to be ready to hang
+            // (starts in this mode)
+                case HANDS_UP:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setTargetPosition(ACTUATOR_CONSTANTS.maxPos);
+                        linearActuatorLeft.setTargetPosition(ACTUATOR_CONSTANTS.maxPos);
+                        linearActuatorRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearActuatorRight.setPower(ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                        isActuatorStateInitialized = true;
+                    }
+
+                    boolean rightUp = Math.abs(linearActuatorRight.getCurrentPosition() - ACTUATOR_CONSTANTS.maxPos) < 20;
+
+                    boolean leftUp = Math.abs(linearActuatorLeft.getCurrentPosition() - ACTUATOR_CONSTANTS.maxPos) < 20;
+
+                    // disable actuators one at a time in case they get off sync
+//                    if (rightUp) linearActuatorRight.setPower(0);
+//                    if (leftUp) linearActuatorLeft.setPower(0);
+
+
+                    // EXIT
+                    if (rightUp && leftUp) {
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+
+
+                    break;
+
+                case HANDS_DOWN:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setTargetPosition(ACTUATOR_CONSTANTS.hangPos);
+                        linearActuatorLeft.setTargetPosition(ACTUATOR_CONSTANTS.hangPos);
+                        linearActuatorRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                        isActuatorStateInitialized = true;
+                    }
+
+                    boolean rightDown = Math.abs(linearActuatorRight.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 10;
+                    boolean leftDown = Math.abs(linearActuatorLeft.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 10;
+
+                    // disable actuators one at a time in case they get off sync
+//                    if (rightDown) linearActuatorRight.setPower(0);
+//                    if (leftDown) linearActuatorLeft.setPower(0);
+
+
+                    // EXIT
+                    if (rightDown && leftDown) {
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+                    break;
+
+            // have grips at rest
+            // (so they do not potentially drain power when not in use)
+                case HANDS_AT_REST:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        linearActuatorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isActuatorStateInitialized = true;
+                    }
+
+
+                    // EXIT
+
+                    // go to hanging position / raised position when commanded to
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+
+                        if (!isRobot2ndLevelAscending) {
+                            isRobot2ndLevelAscending = true;
+                            isActuatorStateInitialized = false;
+                            actuatorHangState = ActuatorHangStates.HANDS_DOWN;
+                        } else {
+                            isRobot2ndLevelAscending = false;
+                            isActuatorStateInitialized = false;
+                            actuatorHangState = ActuatorHangStates.HANDS_UP;
+                        }
+                    }
+
+                    // go to HANDS_RESET if positioning gets off
+                    if (gamepad2.dpad_left) {
+                        isRobot2ndLevelAscending = false;
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_RESET;
+                    }
+                    break;
+
+            // manually move grips down for as long as is pressed
+            // (in case of disconnect)
+                case HANDS_RESET:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(-0.5);
+                        linearActuatorLeft.setPower(-0.5);
+                        isActuatorStateInitialized = true;
+                    }
+
+                    // EXIT
+
+                    // leave once button is let go so it doesn't drive down into the robot forever
+                    if (!gamepad2.dpad_left) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_UP;
+                    }
+
+
+                    break;
+            }
+
 
 
 
 // DRIVETRAIN ------------------------------------------------------------------------------------
 
-            // TODO: add april tag runner (modify RobotVision class camera rotation offset)
 
             // set drive speed
             if (gamepad1.right_bumper && !checkGOneRB && driveSpeedIndex < driveSpeedRange.length-1) {
@@ -1523,6 +1667,16 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             telemetry.addData("SLIDE STATE", linearSlideState);
             telemetry.addData("TIME", lightTimer.seconds());
             telemetry.addData("Manual Pivot Checkpoint", manualPivotCheckpoint);
+            telemetry.addLine("-------------------------");
+
+            telemetry.addData("ACTUATOR STATE", actuatorHangState);
+            telemetry.addLine("-------------------------");
+
+            telemetry.addLine("ACTUATORS");
+            telemetry.addData("LAR POW", linearActuatorRight.getPower());
+            telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+            telemetry.addData("LAR POS", linearActuatorRight.getCurrentPosition());
+            telemetry.addData("LAL POS", linearActuatorLeft.getCurrentPosition());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("DRIVETRAIN");
@@ -1681,6 +1835,9 @@ public class IntoTheDeepTeleop extends LinearOpMode {
         linearSlideLift = hardwareMap.get(DcMotorEx.class, "linearSlideLift");
         linearSlidePivot = hardwareMap.get(DcMotorEx.class, "linearSlidePivot");
 
+        linearActuatorRight = hardwareMap.get(DcMotorEx.class, "linearActuatorRight");
+        linearActuatorLeft = hardwareMap.get(DcMotorEx.class, "linearActuatorLeft");
+
         intakeWheelR = hardwareMap.get(CRServo.class, "intakeWheelR");
         intakeWheelL = hardwareMap.get(CRServo.class, "intakeWheelL");
         intakePivot = hardwareMap.get(Servo.class, "intakePivot");
@@ -1704,6 +1861,17 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         linearSlidePivot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        linearActuatorRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        linearActuatorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        linearActuatorRight.setPower(0);
+        linearActuatorRight.setTargetPosition(ACTUATOR_CONSTANTS.minPos);
+        linearActuatorRight.setMode(DcMotor.RunMode.RUN_TO_POSITION);
+        linearActuatorLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        linearActuatorLeft.setPower(0);
+        linearActuatorRight.setTargetPosition(ACTUATOR_CONSTANTS.minPos);
+        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_TO_POSITION);
 
         sampleSensor.setGain(SENSOR_VARIABLES.sampleSensorGain);
 
