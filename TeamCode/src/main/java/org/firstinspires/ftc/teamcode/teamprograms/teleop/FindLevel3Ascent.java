@@ -26,7 +26,7 @@ public class FindLevel3Ascent extends LinearOpMode {
 
 
     private final double ACTUATOR_SPEED = 1.0;
-    private final double SLIDE_SPEED = 0.7;
+    private final double SLIDE_SPEED = 1.0;
     private final double PIVOT_SPEED = 0.4;
 
     private final double DRIVE_SPEED = 0.6;
@@ -158,7 +158,7 @@ public class FindLevel3Ascent extends LinearOpMode {
                     linearSlideCushion);
         } else {
             // make lowering slides slower
-            linearSlidePower = ((-gamepad2.right_stick_y)*SLIDE_SPEED*0.5);
+            linearSlidePower = ((-gamepad2.right_stick_y)*SLIDE_SPEED*0.9);
         }
 
         // make descent of slides slightly slower so it is not jarring

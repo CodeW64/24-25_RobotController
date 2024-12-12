@@ -18,7 +18,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 1.6.0 RELEASE
+ * Teleop Version: 1.6.1 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -130,7 +130,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
     // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimitIntake = 1750;
+        public double extensionLimitIntake = 2500; // 1750
         public double extensionLimitHang = 3800;
         public double cushionRatio = 400;
         public double topBucketHeightAlternate = 4200;
@@ -288,7 +288,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 1.6.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 1.6.1 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
@@ -1485,15 +1485,22 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
                     boolean leftUp = Math.abs(linearActuatorLeft.getCurrentPosition() - ACTUATOR_CONSTANTS.maxPos) < 20;
 
-                    // disable actuators one at a time in case they get off sync
-//                    if (rightUp) linearActuatorRight.setPower(0);
-//                    if (leftUp) linearActuatorLeft.setPower(0);
-
 
                     // EXIT
                     if (rightUp && leftUp) {
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+                    // go to HANDS_RESET if positioning gets off
+                    if (gamepad2.dpad_left) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        linearActuatorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isRobot2ndLevelAscending = false;
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_RESET;
                     }
 
 
@@ -1511,12 +1518,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                         isActuatorStateInitialized = true;
                     }
 
-                    boolean rightDown = Math.abs(linearActuatorRight.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 10;
-                    boolean leftDown = Math.abs(linearActuatorLeft.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 10;
-
-                    // disable actuators one at a time in case they get off sync
-//                    if (rightDown) linearActuatorRight.setPower(0);
-//                    if (leftDown) linearActuatorLeft.setPower(0);
+                    boolean rightDown = Math.abs(linearActuatorRight.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 20;
+                    boolean leftDown = Math.abs(linearActuatorLeft.getCurrentPosition() - ACTUATOR_CONSTANTS.hangPos) < 20;
 
 
                     // EXIT
@@ -1579,6 +1582,10 @@ public class IntoTheDeepTeleop extends LinearOpMode {
                     if (!gamepad2.dpad_left) {
                         linearActuatorRight.setPower(0);
                         linearActuatorLeft.setPower(0);
+                        linearActuatorRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearActuatorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_UP;
                     }
