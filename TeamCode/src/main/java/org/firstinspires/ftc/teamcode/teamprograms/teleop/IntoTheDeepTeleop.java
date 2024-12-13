@@ -191,7 +191,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
 
     // constant variables
-    final double SLIDE_SPEED = 0.9; // was 0.5
+    final double SLIDE_SPEED = 1.0; // was 0.5
     final double PIVOT_SPEED = 1.0;
     final double ACTUATOR_SPEED = 1.0;
 
@@ -215,7 +215,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
 
         // drivetrain
         int driveSpeedIndex = 1; // change this to the index of the speed you want to start at
-        double[] driveSpeedRange = {0.3, 0.6, 1};
+        double[] driveSpeedRange = {0.3, 0.64, 1};
         double driveSpeedFactor = 1;
 
         // tank drive
