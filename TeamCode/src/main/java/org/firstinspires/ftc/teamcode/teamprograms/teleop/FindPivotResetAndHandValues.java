@@ -9,13 +9,16 @@ import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 
 @TeleOp(group = "AAA")
-public class FindResetAndSpecimenValues extends LinearOpMode {
+public class FindPivotResetAndHandValues extends LinearOpMode {
 
     DcMotorEx linearSlideLift, linearSlidePivot;
+    DcMotorEx linearActuatorRight, linearActuatorLeft;
     TouchSensor linearSlideSwitch, pivotResetSwitch;
     Servo intakePivot;
 
     final int PIVOT_SPECIMEN_POSITION = 2300;
+
+    final double ACTUATOR_SPEED = 1.0;
 
     enum SpecimenStates {
         PIVOT_STATIONARY, RESET_PIVOT_LOWER, RESET_PIVOT_LEVEL, PIVOT_TO_SPECIMEN
@@ -33,6 +36,14 @@ public class FindResetAndSpecimenValues extends LinearOpMode {
 
         linearSlidePivot.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         linearSlidePivot.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        linearActuatorRight = hardwareMap.get(DcMotorEx.class, "linearActuatorRight");
+        linearActuatorLeft = hardwareMap.get(DcMotorEx.class, "linearActuatorLeft");
+
+        linearActuatorRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        linearActuatorRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+        linearActuatorLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+        linearActuatorLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
         pivotResetSwitch = hardwareMap.get(TouchSensor.class, "pivotResetSwitch");
@@ -175,9 +186,20 @@ public class FindResetAndSpecimenValues extends LinearOpMode {
             }
 
 
+            // ACTUATORS
+
+            // move linear actuators
+            double powerActuatorUp = (-gamepad2.right_trigger) * ACTUATOR_SPEED;
+            double powerActuatorDown = (-gamepad2.left_trigger) * ACTUATOR_SPEED;
+            linearActuatorRight.setPower(powerActuatorUp - powerActuatorDown);
+            linearActuatorLeft.setPower(powerActuatorUp - powerActuatorDown);
+
+
 
             telemetry.addData("LIFT POS", linearSlideLift.getCurrentPosition());
             telemetry.addData("PIVOT POS", pivotPosition);
+            telemetry.addData("LAR POS", linearActuatorRight.getCurrentPosition());
+            telemetry.addData("LAL POS", linearActuatorLeft.getCurrentPosition());
             telemetry.update();
         }
 

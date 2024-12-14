@@ -1,5 +1,6 @@
 package org.firstinspires.ftc.teamcode.teamprograms.teleop;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
@@ -8,6 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp(group = "Z")
+@Disabled
 public class AccelerationTest extends LinearOpMode  {
 
     DcMotorEx linearSlidePivot;
@@ -43,10 +45,10 @@ public class AccelerationTest extends LinearOpMode  {
                 isInitialized = true;
             }
 
-//            double timeAccel = Math.min((lightTimer.seconds()*2), 0.9);
-//            linearSlidePivot.setPower(timeAccel);
+            double timeAccel = Math.min((lightTimer.seconds()*2), 0.9);
+            linearSlidePivot.setPower(timeAccel);
 
-            linearSlidePivot.setPower(1.0);
+//            linearSlidePivot.setPower(1.0);
 
 
             telemetry.addData("TIME:", lightTimer.seconds());

@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Condition;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.hardware.Gamepad;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import org.firstinspires.ftc.robotcore.external.Telemetry;
@@ -45,6 +46,8 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
  * @author Connor Larson
  */
 @Autonomous(name="Basket Placer (Preloaded Sample)")
+@Disabled
+@Deprecated
 public class SamplePreloadBasket extends AutoCommonPaths {
     private boolean isBlue = true;
     private boolean shouldParkObservation = false; // False: Go to ascent zone there

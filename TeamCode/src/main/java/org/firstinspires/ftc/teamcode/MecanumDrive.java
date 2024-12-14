@@ -72,30 +72,30 @@ public final class MecanumDrive {
         public double lateralInPerTick = 0.002525487032662218; // run LatRampLog if having issues (normally = inPerTick)
 
         // 30 = 5575.1
-        public double trackWidthTicks = 3455.7795234191576;
+        public double trackWidthTicks = 4320.3; // 4320.3 OLD 3455.7795234191576
 
         // feedforward parameters (in tick units)
 
         //kV: 0.0007482212097879431, kS: 1.0062087209129773
         // 30 = 0.53
-        public double kS = 1.0062087209129773;
+        public double kS = 1.56; // 1.56 OLD 1.0062087209129773
 
         // 30 = 0.000541
-        public double kV = 0.0007482212097879431;
+        public double kV = 0.00054; // 0.00054 OLD 0.0007482212097879431
 
         // 30 = 0.00004
-        public double kA = 0.0000929688;
+        public double kA = 0.00005; // 0.00005 OLD 0.0000929688
 
         // path profile parameters (in inches)
 
         // 30 = 30
-        public double maxWheelVel = 40;
+        public double maxWheelVel = 50; // 35
 
         // 30 = -30
-        public double minProfileAccel = -40;
+        public double minProfileAccel = -30; // -30
 
         // 30 = 30
-        public double maxProfileAccel = 40;
+        public double maxProfileAccel = 30; // 30
 
         // turn profile parameters (in radians)
 
@@ -103,7 +103,7 @@ public final class MecanumDrive {
         public double maxAngVel = 2.880; // shared with path
 
         // 30 = 2.531 ~ Math.toRadians(145)
-        public double maxAngAccel = 2.880; // ~ 165 degrees
+        public double maxAngAccel = 2.880; // ~ 165 degrees // 2.880
 
         // path controller gains
 
@@ -116,8 +116,8 @@ public final class MecanumDrive {
         // 30 = 3.0
         public double headingGain = 5.0; // shared with turn
 
-        public double axialVelGain = 0.0;
-        public double lateralVelGain = 0.0;
+        public double axialVelGain = 1.0;
+        public double lateralVelGain = 1.0;
         public double headingVelGain = 0.0; // shared with turn
     }
 
@@ -274,9 +274,9 @@ public final class MecanumDrive {
 
 
         // FIXME: use localizer needed
-        localizer = new TwoDeadWheelLocalizer(hardwareMap, lazyImu.get(), PARAMS.inPerTick);
-//        localizer = new GoBildaFullLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
-//        localizer = new RRGobildaLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+        // localizer = new TwoDeadWheelLocalizer(hardwareMap, lazyImu.get(), PARAMS.inPerTick);
+    //    localizer = new GoBildaFullLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
+       localizer = new RRGobildaLocalizer(hardwareMap, bildaDriver, PARAMS.inPerTick);
 
 
         FlightRecorder.write("MECANUM_PARAMS", PARAMS);
@@ -338,7 +338,7 @@ public final class MecanumDrive {
             // UNCOMMENT HERE
             if ((t >= timeTrajectory.duration
                     && error.position.norm() < 1
-                    && Math.abs(error.heading.toDouble()) < 1
+                    && Math.abs(error.heading.toDouble()) < Math.toRadians(5)
                     && robotVelRobot.linearVel.norm() < 5)
                     || t >= timeTrajectory.duration + 1) {
                 leftFront.setPower(0);
