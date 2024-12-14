@@ -88,7 +88,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private double sampleSensingDistance;
 
     private int CHAMBER_EXTENSION = 2500;
-    private int TWELVE_INCHES_EXTENSION = 1700;
+    private int TWELVE_INCHES_EXTENSION = 1670;
     private int FULLY_RETRACTED = 600;
     
     private double EXTENSION_POWER = 1.0; // Previously 0.15
@@ -593,10 +593,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         lift.extendSlides(TWELVE_INCHES_EXTENSION, 10, EXTENSION_POWER);
     }
 
-    private void extendSync() {
+    private void extendSync(int offset) {
         AutoInit.driveMotorTo(
             linearSlideLift, 
-            TWELVE_INCHES_EXTENSION, 
+            TWELVE_INCHES_EXTENSION + offset, 
             10, 
             EXTENSION_POWER
         );
@@ -686,12 +686,12 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      *  
      * @throws InterruptedException
      */
-    private void grabSampleSync(boolean retry) throws InterruptedException {
+    private void grabSampleSync(boolean retry, int offset) throws InterruptedException {
         // TODO: Make this retry if nothing is grabbed
         telemetry.addLine("Extending to sample...");
         telemetry.update();
         lift.waitForFinish(); // Wait for the arm to finish retraction
-        extendSync();
+        extendSync(offset);
         // lift.waitForExtension(); // Waiting for full extension
 
         retryLoop:
@@ -779,7 +779,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * Extends the linear slides so that the specimen can hook
      */
     private void extendToChambersAsync() {
-        lift.extendSlides(CHAMBER_EXTENSION, 10, 1.0);
+        lift.extendSlides(CHAMBER_EXTENSION, 20, 1.0);
     }
 
     private void hookChamber() throws InterruptedException {
@@ -899,6 +899,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // Starting the actual stuffs
         lift.start();
+        SLIDE_CONSTANTS.depositEndRetract = TWELVE_INCHES_EXTENSION;
 
         // Driving to the chamber and scoring
         timer = timeSection("chamber_inital");
@@ -912,7 +913,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 //        }
         moveAndPlaceSpecimen();
         switchArmAsync(); // Lowring the arm
-        // globalDrive.maxWheelVel = 40;
+        globalDrive.PARAMS.maxWheelVel = 40;
         logTime(timer);
         // if(arg) {
         //     return;
@@ -923,7 +924,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         for(int i = 2; i >= 1 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
+            final double extraRotation = i == 0 ? Math.toRadians(30) : 0; // Rotate more cuz' last one's hard to get to. 
             final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
             final Pose2d grabbingDistance = new Pose2d(-20, 0, 0);
             
@@ -957,7 +958,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             timer = timeSection("grab_sample_" + (3 - i));
             telemetry.addLine("\n=====> Grabbing the sample...");
             telemetry.update();
-            grabSampleSync(false); // Grab the pixel. and retract
+            grabSampleSync(false, -50 * (2 - i)); // Grab the pixel. and retract
             logTime(timer);
             isTime = false;
 
@@ -975,7 +976,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
             timer = timeSection("move_zone_" + (3 - i));
             final double DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
-            final double DIST_BACK = 9.5 - DIST_INCREMENT * (2 - i);
+            final double DIST_BACK = 9.5/*  - DIST_INCREMENT * (2 - i) */;
             final double DIST_STRAFE = 2.5;            
             final double SQRT2 = Math.sqrt(2);
             final Pose2d BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
