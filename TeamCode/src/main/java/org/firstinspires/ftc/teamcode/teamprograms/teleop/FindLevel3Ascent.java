@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 
 @TeleOp(group = "Z")
 @Config
+@Deprecated
 public class FindLevel3Ascent extends LinearOpMode {
 
     DcMotorEx linearSlideLift, linearSlidePivot;

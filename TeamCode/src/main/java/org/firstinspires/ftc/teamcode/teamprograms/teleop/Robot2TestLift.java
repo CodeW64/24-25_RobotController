@@ -1,21 +1,32 @@
 package org.firstinspires.ftc.teamcode.teamprograms.teleop;
 
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
+import com.qualcomm.robotcore.hardware.Servo;
 
+@TeleOp(group = "AAA")
 public class Robot2TestLift extends LinearOpMode {
 
     DcMotorEx linearSlideRight, linearSlideLeft;
     DcMotorEx linearPivotRight, linearPivotLeft;
 
+    Servo intakePivot;
+
     final double SLIDE_SPEED = 0.7;
-    final double PIVOT_SPEED = 0.7;
+    final double PIVOT_SPEED = 0.4;
+
+    private final double PIVOT_TICKS_PER_DEGREE = 23.26; // (motor PPR / gear ratio) / 360
+
+    private final double GRAVITY_COEFFICIENT = 0.002;
 
     @Override
     public void runOpMode() {
         initHardware();
+
+        intakePivot.setPosition(0.52);
 
         telemetry.addLine("Press Start");
         telemetry.update();
@@ -28,10 +39,18 @@ public class Robot2TestLift extends LinearOpMode {
         while (opModeIsActive()) {
 
             double linearSlidePosition = (linearSlideRight.getCurrentPosition() + linearSlideLeft.getCurrentPosition()) / 2.0;
+            double pivotPositionR = linearPivotRight.getCurrentPosition();
+            double pivotPositionL = linearPivotLeft.getCurrentPosition();
 
             // set power for motors
             slidePower = calculateSlidePower(linearSlidePosition);
+
+
             pivotPower = (-gamepad2.left_stick_y) * PIVOT_SPEED;
+
+            // find feedforward to fight gravity based on arm being completely horizontal when starting
+            double pivotFFR = Math.cos(Math.toRadians(pivotPositionR / PIVOT_TICKS_PER_DEGREE + 1)) * GRAVITY_COEFFICIENT;
+            double pivotFFL = Math.cos(Math.toRadians(pivotPositionL / PIVOT_TICKS_PER_DEGREE + 1)) * GRAVITY_COEFFICIENT;
 
 
             // apply power to motors
@@ -39,6 +58,8 @@ public class Robot2TestLift extends LinearOpMode {
             linearSlideLeft.setPower(slidePower);
             linearPivotRight.setPower(pivotPower);
             linearPivotLeft.setPower(pivotPower);
+//            linearPivotRight.setPower(pivotPower + pivotFFR);
+//            linearPivotLeft.setPower(pivotPower + pivotFFL);
 
 
 
@@ -76,7 +97,7 @@ public class Robot2TestLift extends LinearOpMode {
         double linearSlideCushion = 1;
 
         // determine the cushion for the linear slide so robot does not exceed extension limit
-        linearSlideCushion = (4200.0 - linearSlidePosition)
+        linearSlideCushion = (4000.0 - linearSlidePosition)
                 /400.0;
 
         // determine whether to apply the cushion or ignore it
@@ -104,8 +125,11 @@ public class Robot2TestLift extends LinearOpMode {
         linearPivotRight = hardwareMap.get(DcMotorEx.class, "linearPivotRight");
         linearPivotLeft = hardwareMap.get(DcMotorEx.class, "linearPivotLeft");
 
-        linearSlideLeft.setDirection(DcMotorSimple.Direction.REVERSE);
-        linearPivotLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+
+//        linearSlideLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        linearSlideRight.setDirection(DcMotorSimple.Direction.REVERSE);
+//        linearPivotLeft.setDirection(DcMotorSimple.Direction.REVERSE);
+        linearPivotRight.setDirection(DcMotorSimple.Direction.REVERSE);
 
         linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
         linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
@@ -116,6 +140,8 @@ public class Robot2TestLift extends LinearOpMode {
         linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+
+        intakePivot = hardwareMap.get(Servo.class, "intakePivot");
 
     }
 }

@@ -291,8 +291,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             telemetry.addLine("TELEOP VERSION 1.6.1 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
-            telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
-            telemetry.addLine("CONTROLLER 1 BUTTON B: MECANUM DRIVE");
+            telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
+            telemetry.addLine("CONTROLLER 1 LEFT BUMPER: MECANUM DRIVE");
             telemetry.addLine("-------------------------");
             telemetry.addLine("Press Start");
             telemetry.update();
@@ -416,7 +416,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             switch (linearSlideState) {
 
             // lift in position to grab samples
-            // speed of intake wheels is at max
+            // speed of intake wheels is at rest
                 case INTAKE_ACTIVE:
 
                     if (!isStateInitialized) {
