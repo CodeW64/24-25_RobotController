@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 2.2.1 RELEASE
+ * Teleop Version: 2.2.2 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -293,7 +293,7 @@ public class Robot2Teleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 2.2.1 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.2.2 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -665,7 +665,7 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // start exiting right before slide hits 0
                     // (attempts to make transition faster and smoother)
-                    if (linearSlideAvgPosition < 200 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    if (linearSlideAvgPosition < 800 || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
                     }
@@ -719,7 +719,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // make deposit accessible once lift has finished pivoting
                     // (and once slide has finished retracting)
                     // NOTE: pivot finishes in deposit mode
-                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.depositPos) < 500 &&
+                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.depositPos) < 700 &&
                         isArmPositionSet) {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
