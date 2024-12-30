@@ -13,7 +13,7 @@ import com.qualcomm.robotcore.hardware.Servo;
  * (Also note that slides must be fully retracted to pivot since motors are not strong enough)
  **/
 
-@TeleOp(group = "AAA")
+@TeleOp(group = "ZZZ")
 @Deprecated
 public class Robot2TestRunToPosition extends LinearOpMode {
 

@@ -2,6 +2,7 @@ package org.firstinspires.ftc.teamcode.temp;
 
 import androidx.annotation.NonNull;
 
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
@@ -9,6 +10,7 @@ import org.firstinspires.ftc.teamcode.FailedInitializationException;
 import org.firstinspires.ftc.teamcode.RobotVision;
 
 @TeleOp(group = "E")
+@Disabled
 public class ExceptionChecker extends LinearOpMode {
 
     RobotVision vision;

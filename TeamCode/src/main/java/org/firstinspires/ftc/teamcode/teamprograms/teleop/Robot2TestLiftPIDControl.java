@@ -14,7 +14,7 @@ import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
 
-@TeleOp(group = "AAA")
+@TeleOp(group = "ZZZ")
 @Config
 public class Robot2TestLiftPIDControl extends LinearOpMode {
 
