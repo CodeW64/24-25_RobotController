@@ -719,7 +719,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // make deposit accessible once lift has finished pivoting
                     // (and once slide has finished retracting)
                     // NOTE: pivot finishes in deposit mode
-                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.depositPos) < 700 &&
+                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.depositPos) < 750 &&
                         isArmPositionSet) {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
