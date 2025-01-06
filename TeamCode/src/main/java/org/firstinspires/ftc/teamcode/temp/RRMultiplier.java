@@ -1,11 +1,13 @@
 package org.firstinspires.ftc.teamcode.temp;
 
 import com.acmerobotics.roadrunner.Rotation2d;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 
 
 @TeleOp(group = "T")
+@Disabled
 public class RRMultiplier extends LinearOpMode {
 
     double randomMultiplier = 0.4;
