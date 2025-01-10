@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 2.4.2 RELEASE
+ * Teleop Version: 2.5.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -135,11 +135,11 @@ public class Robot2Teleop extends LinearOpMode {
     // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimitIntake = 2500; // 1750
-        public double extensionLimitSpecimen = 3800; // FIXME: adjust to fit within limit
-        public double extensionLimitHang = 3800;
-        public double cushionRatio = 400;
-        public double topBucketHeightAlternate = 4100;
+        public double extensionLimitIntake = 1780.0; // 312RPM-2500
+        public double extensionLimitSpecimen = 2700.0; // 312RPM-3800 // FIXME: adjust to fit within limit
+        public double extensionLimitHang = 2700.0; // 312RPM-3800
+        public double cushionRatio = 400.0;
+        public double topBucketHeightAlternate = 2930.0; // 312RPM-4100
 
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
@@ -312,7 +312,7 @@ public class Robot2Teleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 2.4.2 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.5.0 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -428,7 +428,7 @@ public class Robot2Teleop extends LinearOpMode {
                     if (!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
 
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
 
@@ -451,15 +451,16 @@ public class Robot2Teleop extends LinearOpMode {
                     // ATTEMPT/DIVIDE SAMPLE
 
                     // attempt to grab a sample (if safe)
+                    // slide exit 312RPM-500
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT &&
-                        linearSlideAvgPosition > 500) {
+                        linearSlideAvgPosition > 350) {
                         checkGTwoRT = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
                     } else if (gamepad2.right_bumper && !checkGTwoRB &&
-                        linearSlideAvgPosition > 500) {
+                        linearSlideAvgPosition > 350) {
                         checkGTwoRB = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
@@ -736,7 +737,8 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // start exiting right before slide hits 0
                     // (attempts to make transition faster and smoother)
-                    if (linearSlideAvgPosition < 800 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    // slide exit 312RPM-800
+                    if (linearSlideAvgPosition < 570 || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
 
                         if (specimanning) {
@@ -977,7 +979,8 @@ public class Robot2Teleop extends LinearOpMode {
 
 
                     // exit mode if slide has gone far enough to safely start pivoting
-                    if (linearSlideAvgPosition < 1800 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    // slide exit 312RPM-1800
+                    if (linearSlideAvgPosition < 1280 || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
 
                         if (!hanging) {
