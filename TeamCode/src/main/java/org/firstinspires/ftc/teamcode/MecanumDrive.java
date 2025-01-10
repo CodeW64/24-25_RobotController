@@ -339,7 +339,7 @@ public final class MecanumDrive {
             // UNCOMMENT HERE
             if ((t >= timeTrajectory.duration
                     && error.position.norm() < 1
-                    && Math.abs(Math.toDegrees(error.heading.toDouble())) < 1
+                    && Math.abs(Math.toDegrees(error.heading.toDouble())) < 5
                     && robotVelRobot.linearVel.norm() < 5)
                     || t >= timeTrajectory.duration + 1) {
                 leftFront.setPower(0);

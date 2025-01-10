@@ -900,6 +900,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // Starting the actual stuffs
         lift.start();
         SLIDE_CONSTANTS.depositEndRetract = TWELVE_INCHES_EXTENSION;
+        SLIDE_CONSTANTS.intakeEndRetract = TWELVE_INCHES_EXTENSION;
 
         // Driving to the chamber and scoring
         timer = timeSection("chamber_inital");

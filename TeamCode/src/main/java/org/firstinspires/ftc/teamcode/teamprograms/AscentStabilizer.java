@@ -109,6 +109,20 @@ public class AscentStabilizer {
     }
 
     /**
+     * Computes the angle at which the hook will be hooked onto the second 
+     * rung. This, compared to the theta method, is based off of the length 
+     * of the the arm upon invocation, not the height off the ground. 
+     * 
+     * @param l Length of the arm that hooks onto the high rung
+     * @return An angle, in radians, at which the robot will be vertical while
+     *     holding the high rung 
+     */
+    public double thetaFromL(double l) {
+        final double lSqr = l * l;
+        return Math.asin((-r * x + Math.sqrt((lSqr - r * r) * (lSqr - x * x))) / lSqr);
+    }
+
+    /**
      * Computes the first derivative of the theta. This is based on the 
      * current desired theta, current height, and the height vel, not the 
      * last theta.

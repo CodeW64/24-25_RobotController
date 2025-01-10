@@ -10,6 +10,7 @@ import com.qualcomm.robotcore.hardware.DcMotor;
 import com.qualcomm.robotcore.hardware.DcMotorEx;
 import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.hardware.DistanceSensor;
+import com.qualcomm.robotcore.hardware.IMU;
 import com.qualcomm.robotcore.hardware.Servo;
 import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
@@ -90,6 +91,7 @@ public class Robot2Teleop extends LinearOpMode {
     Servo intakePivot;
     CRServo duckSpinner;
     DistanceSensor heightSensor;
+    IMU imu;
 
     ColorRangeSensor sampleSensor;
     TouchSensor linearSlideSwitch;
@@ -136,17 +138,22 @@ public class Robot2Teleop extends LinearOpMode {
     // STABILIZER VARIABLES
     public static class StabilizerConstants {
         public double hookRadius = 1.25; // Inches
-        public double drawBack = 0; // Inches
+        public double drawBack = 1; // Inches
         public double distFromBarrier = 13.5; // X direction offset from barrier
         public double initialHookDist = 10; // Inches
-        public double heightSensorOffset = -3.5; // Inches up from pivot
+        public double heightSensorOffsetX = 0; // Inches front from the pivot
+        public double heightSensorOffsetY = -3.5; // Inches up from pivot
         public double highRungHeight = 35.5; // Inches
     }
 
     public static StabilizerConstants STABILIZER_CONSTANTS = new StabilizerConstants();
 
     public DistanceGetter heightGetter = (DistanceUnit unit) -> {
-        return heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffset;
+        final double theta = imu.getRobotYawPitchRollAngles().getPitch(); 
+        return 
+            (heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffsetY) 
+            * Math.cos(theta)
+            + STABILIZER_CONSTANTS.heightSensorOffsetY * Math.sin(theta);
     };
 
     // SLIDE VARIABLES (editable by FTC dashboard)
@@ -201,7 +208,10 @@ public class Robot2Teleop extends LinearOpMode {
         HANG_ABORT,
 
         PIVOT_TO_STABILIZE_ROBOT, RETRACT_TO_STABILIZE,
-        STABILIZE_ROBOT, HANG_TIME_AUTOMATIC_HANDS, HANG_TIME_AUTOMATIC_HANDS_ALTERNATE, HANG_TIME_MANUAL,
+        STABILIZE_ROBOT, 
+        HANG_TIME_AUTOMATIC_HANDS, HANG_TIME_AUTOMATIC_HANDS_ALTERNATE, 
+        HANG_TIME_AUTOMATIC_ARM, HANG_TIME_AUTOMATIC_ARM_ALTERNATE,
+        HANG_TIME_MANUAL,
 
         MANUAL_OVERRIDE,
 
@@ -429,8 +439,6 @@ public class Robot2Teleop extends LinearOpMode {
                 isStateInitialized = false;
                 linearSlideState = LinearSlideStates.PIVOT_MANUAL_RESET;
             }
-
-
 
 // LIFT STATE MACHINE ----------------------------------------------------------------------------
 
@@ -1584,7 +1592,7 @@ public class Robot2Teleop extends LinearOpMode {
                         
                         isRunningPivotToPosition = true;
                         overridePID = false;
-                        linearSlideState = LinearSlideStates.HANG_TIME_MANUAL;
+                        linearSlideState = LinearSlideStates.HANG_TIME_AUTOMATIC_ARM;
                     }
     
                     // Restabilize the robot to remove additive error from adding only *velocities*
@@ -1604,15 +1612,57 @@ public class Robot2Teleop extends LinearOpMode {
                     break;
                 }
                 
+                
+                // Keeping the robot vertical while manually changing the length of the arm
+                case HANG_TIME_AUTOMATIC_ARM: {
+                    if(!isStateInitialized) {
+                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isRunningPivotToPosition = true;
+                        overridePID = false;
+                        isStateInitialized = true;
+                    }
+                    
+                    // Powering the arm
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, false);
+                    linearSlideRight.setPower(linearSlidePower);
+                    linearSlideLeft.setPower(linearSlidePower);
+
+                    // Getting the values for the angle
+                    final double t = lightTimer.seconds();
+                    ascentStabilizer.update(t);
+                    desiredArmLength = liftTicksToHookDistInches(linearSlideAvgPosition);
+                    desiredArmTheta = ascentStabilizer.thetaFromL(desiredArmLength);
+                    linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
+
+                    // EXIT
+                    // Transition to the next phase
+                    if(gamepad2.dpad_up && checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isRunningPivotToPosition = true;
+                        overridePID = false;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.HANG_TIME_MANUAL;
+                    }
+                    break;
+                }
+                
+                // Manually change the angle and length of the arm
                 case HANG_TIME_MANUAL: {
                     if(!isStateInitialized) {
-                        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER); // Done to keep power loss at a minimum
-                        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER); // Done to keep power loss at a minimum
+                        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearSlideLeft.setPower(0);
                         linearSlideRight.setPower(0);
 
-                        linearPivotLeft.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER); // Done to keep power loss at a minimum
-                        linearPivotRight.setMode(DcMotorEx.RunMode.RUN_WITHOUT_ENCODER); // Done to keep power loss at a minimum
+                        linearPivotLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                        linearPivotRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearPivotLeft.setPower(0);
                         linearPivotRight.setPower(0);
                         
@@ -2047,6 +2097,8 @@ public class Robot2Teleop extends LinearOpMode {
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
+
+        imu = hardwareMap.get(IMU.class, "imu");
         heightSensor = hardwareMap.get(DistanceSensor.class, "heightSensor");
 
         // MOTOR/SERVO DIRECTIONS AND POSITION INITIALIZATION
