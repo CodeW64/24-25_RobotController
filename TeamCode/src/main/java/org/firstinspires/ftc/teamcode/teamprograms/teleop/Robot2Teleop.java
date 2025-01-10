@@ -19,7 +19,7 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 /**
  * Welcome!
- * Teleop Version: 2.4.0 RELEASE
+ * Teleop Version: 2.4.2 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -99,8 +99,8 @@ public class Robot2Teleop extends LinearOpMode {
         public double pivotDepositPos = 0.4;
         public double pivotRestPos = 0.52;
         public double pivotCarryPos = 0.6;
-        public double specimenGrabberOpenPos = 1.; // adjust
-        public double specimenGrabberClosePos = 0.0; // adjust
+        public double specimenGrabberOpenPos = 0.58; // adjust
+        public double specimenGrabberClosePos = 0.47; // adjust
     }
     public static ServoValues SERVO_VALUES = new ServoValues();
 
@@ -158,9 +158,9 @@ public class Robot2Teleop extends LinearOpMode {
         public double intakePos = 100;
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
-        public double specimenGrabPos = 600; // adjust to right angle
-        public double specimenPositionPos = 1400; // adjust to right angle
-        public double specimenPlacePos = 1200; // adjust to right angle
+        public double specimenGrabPos = 700; // adjust to right angle
+        public double specimenPositionPos = 1200; // adjust to right angle
+        public double specimenPlacePos = 1000; // adjust to right angle
         public double hangPos = 900;
 
     }
@@ -289,6 +289,7 @@ public class Robot2Teleop extends LinearOpMode {
         boolean isIntakeProtected = false;
         boolean isGrabberOpen = true;
         boolean isArmPositionSet = true;
+        boolean isHangPivotPowered = true;
 
         // ACTUATOR LOGIC
         boolean isActuatorInitialized = false;
@@ -311,7 +312,7 @@ public class Robot2Teleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 2.4.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.4.2 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -441,7 +442,6 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-
                     // SLIDES
 
                     linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
@@ -467,8 +467,6 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.INTAKE_DIVIDE_SAMPLE;
                     }
 
-
-
                     // EXIT INTAKE
 
                     // start sequence to pivot to deposit
@@ -490,7 +488,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // start sequence to pivot to specimen
                     if (gamepad2.left_bumper && !checkGTwoLB) {
                         checkGTwoLB = true;
-                        specimanning = false;
+                        specimanning = true;
                         hanging = false;
 
                         linearSlideRight.setPower(0);
@@ -1185,8 +1183,8 @@ public class Robot2Teleop extends LinearOpMode {
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
 
-                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
-                        isGrabberOpen = true;
+                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        isGrabberOpen = false;
                         isStateInitialized = true;
                     }
 
@@ -1216,7 +1214,8 @@ public class Robot2Teleop extends LinearOpMode {
                         specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+//                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+                        linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
                     }
 
                     // go back to intake mode
@@ -1229,13 +1228,15 @@ public class Robot2Teleop extends LinearOpMode {
 
 
             // allows robot to position for a specimen hang
-                case SPECIMEN_POSITION:
+                /*case SPECIMEN_POSITION:
                     if (!isStateInitialized) {
                         duckSpinner.setPower(DUCK_VALUES.spinRest);
 
                         linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenPositionPos;
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
 
                         isStateInitialized = true;
                     }
@@ -1268,7 +1269,7 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
                     }
 
-                    break;
+                    break;*/
 
 
             // allows robot to hang the specimen on the bar
@@ -1279,6 +1280,8 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenPlacePos;
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
 
                         isStateInitialized = true;
                     }
@@ -1319,11 +1322,11 @@ public class Robot2Teleop extends LinearOpMode {
                     }
 
                     // flip back to specimen position if mistaken
-                    if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
+                    /*if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
                         checkGTwoRT = true;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
-                    }
+                    }*/
                     break;
 
 
@@ -1331,6 +1334,8 @@ public class Robot2Teleop extends LinearOpMode {
                 case SPECIMEN_RETRACT:
                     if (!isStateInitialized) {
                         duckSpinner.setPower(DUCK_VALUES.spinRest);
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
 
                         lightTimer.reset();
                         isArmPositionSet = false;
@@ -1363,6 +1368,10 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.SPECIMEN_GRAB;
                     }
+
+
+                    // ABORT
+                    // nothing currently
                     break;
 
 
@@ -1427,9 +1436,10 @@ public class Robot2Teleop extends LinearOpMode {
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
-                        duckSpinner.setPower(DUCK_VALUES.spinStop);
+                        duckSpinner.setPower(DUCK_VALUES.spinRest);
 
                         isRunningPivotToPosition = false;
+                        overridePID = true;
                         isStateInitialized = true;
                     }
 
@@ -1437,10 +1447,20 @@ public class Robot2Teleop extends LinearOpMode {
                     // PIVOT
                     // TODO: needs a custom method (to limit range)?
 
-                    // run pivot
-                    double hangPivotPower = calculateManualPivotPower(linearPivotAvgPosition);
-                    linearPivotRight.setPower(hangPivotPower);
-                    linearPivotLeft.setPower(hangPivotPower);
+                    // run pivot (or not)
+                    if (gamepad2.right_bumper && !checkGTwoRB) {
+                        isHangPivotPowered = !isHangPivotPowered;
+                    }
+
+                    if (isHangPivotPowered) {
+                        double hangPivotPower = calculateManualPivotPower(linearPivotAvgPosition);
+                        linearPivotRight.setPower(hangPivotPower);
+                        linearPivotLeft.setPower(hangPivotPower);
+                    } else {
+                        linearPivotRight.setPower(0);
+                        linearPivotLeft.setPower(0);
+                    }
+
 
 
 
@@ -1475,6 +1495,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // go to hang automatic
                     if (gamepad2.y && !checkGTwoY) {
                         checkGTwoY = true;
+                        overridePID = false;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.HANG_AUTOMATIC;
                     }
@@ -1488,6 +1509,7 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoDUP = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
+                        overridePID = false;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
                     }
@@ -1707,7 +1729,7 @@ public class Robot2Teleop extends LinearOpMode {
 
             // get the hands to the relative correct position for hanging
             // there is a safety to lower in case things go wrong (default case)
-            if (gamepad2.dpad_down) {
+            if (gamepad2.dpad_left) {
                 // lower actuators manually to reset in case of malfunction
                 linearActuatorRight.setPower(-ACTUATOR_SPEED);
                 linearActuatorLeft.setPower(-ACTUATOR_SPEED);
@@ -1840,6 +1862,7 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Intake WR POW", intakeWheelR.getPower());
             telemetry.addData("Intake WL POW", intakeWheelL.getPower());
             telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
+            telemetry.addData("Specimen POS", specimenGrabber.getPosition());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("SENSORS");
@@ -1850,6 +1873,12 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
             telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
             telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+            telemetry.addLine("-------------------------");
+
+            telemetry.addLine("LOGIC");
+            telemetry.addData("Specimanning", specimanning);
+            telemetry.addData("Hanging", hanging);
+            telemetry.addData("Hang Pivot Powered", isHangPivotPowered);
             telemetry.addLine("-------------------------");
 
 
@@ -1993,9 +2022,10 @@ public class Robot2Teleop extends LinearOpMode {
 
         // apply a factor to fight gravity if needed (works and doesn't work at the same time)
         // note that this does not account for the added load due to lever action
-        if (pivotPosition > 200) {
-            pivotPower += pivotFF;
-        }
+//        if (pivotPosition > 100) {
+//            pivotPower += pivotFF;
+//        }
+        pivotPower += pivotFF;
 
         return pivotPower;
     }
