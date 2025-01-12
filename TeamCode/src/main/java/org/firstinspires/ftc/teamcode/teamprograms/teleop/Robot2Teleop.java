@@ -16,6 +16,7 @@ import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.RobotVision;
 import org.firstinspires.ftc.teamcode.teamprograms.AscentStabilizer;
@@ -23,7 +24,7 @@ import org.firstinspires.ftc.teamcode.teamprograms.DistanceGetter;
 
 /**
  * Welcome!
- * Teleop Version: 2.2.2 RELEASE
+ * Teleop Version: 2.5.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -56,7 +57,7 @@ import org.firstinspires.ftc.teamcode.teamprograms.DistanceGetter;
  * [right_trigger] - attempt sample grab (intake)
  * [y_button] - empty intake when full (intake full)
  * [x_button/y_button] - override limit switch (retract and pivot states)
- * [dpad_up] - enter/exit HANG_TIME (from deposit mode)
+ * [dpad_up] - enter/exit HANG modes (from deposit mode)
  * [dpad_down + a_button] - enter MANUAL_OVERRIDE (DANGEROUS)
  * --------------------------
  * MANUAL_OVERRIDE (affects Gamepad 2 only)
@@ -89,6 +90,7 @@ public class Robot2Teleop extends LinearOpMode {
     CRServo linearActuatorRight, linearActuatorLeft;
     CRServo intakeWheelR, intakeWheelL;
     Servo intakePivot;
+    Servo specimenGrabber;
     CRServo duckSpinner;
     DistanceSensor heightSensor;
     IMU imu;
@@ -104,6 +106,8 @@ public class Robot2Teleop extends LinearOpMode {
         public double pivotDepositPos = 0.4;
         public double pivotRestPos = 0.52;
         public double pivotCarryPos = 0.6;
+        public double specimenGrabberOpenPos = 0.58; // adjust
+        public double specimenGrabberClosePos = 0.47; // adjust
     }
     public static ServoValues SERVO_VALUES = new ServoValues();
 
@@ -149,20 +153,21 @@ public class Robot2Teleop extends LinearOpMode {
     public static StabilizerConstants STABILIZER_CONSTANTS = new StabilizerConstants();
 
     public DistanceGetter heightGetter = (DistanceUnit unit) -> {
-        final double theta = imu.getRobotYawPitchRollAngles().getPitch(); 
+        final double theta = imu.getRobotYawPitchRollAngles().getPitch(AngleUnit.RADIANS); 
         return 
             (heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffsetY) 
             * Math.cos(theta)
-            + STABILIZER_CONSTANTS.heightSensorOffsetY * Math.sin(theta);
+            + STABILIZER_CONSTANTS.heightSensorOffsetX * Math.sin(theta);
     };
 
     // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimitIntake = 2500; // 1750
-        public double extensionLimitHang = 3800;
-        public double cushionRatio = 400;
-        public double topBucketHeightAlternate = 4100;
+        public double extensionLimitIntake = 1780.0; // 312RPM-2500
+        public double extensionLimitSpecimen = 2700.0; // 312RPM-3800 // FIXME: adjust to fit within limit
+        public double extensionLimitHang = 2700.0; // 312RPM-3800
+        public double cushionRatio = 400.0;
+        public double topBucketHeightAlternate = 2930.0; // 312RPM-4100
 
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
@@ -181,8 +186,10 @@ public class Robot2Teleop extends LinearOpMode {
         public double intakePos = 100;
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
-        public int hangPos = 2000;
-        public double stabilizeReady = 1300; // Final value in pivot ticks
+        public double specimenGrabPos = 700; // adjust to right angle
+        public double specimenPositionPos = 1200; // adjust to right angle
+        public double specimenPlacePos = 1000; // adjust to right angle
+        public double stabilizeReady = 1300;
 
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
@@ -190,7 +197,7 @@ public class Robot2Teleop extends LinearOpMode {
     final static double PIVOT_TICKS_PER_DEGREE = 2000.0 / 90.0; // (motor PPR / gear ratio) / 360
     final static double PIVOT_TICKS_PER_RAD = PIVOT_TICKS_PER_DEGREE * 180 / Math.PI;
 
-    final double LIFT_TICKS_PER_INCH_EXTENDED = 3450.0 / 30.0;
+    final double LIFT_TICKS_PER_INCH_EXTENDED = 384.5 / 537.7 * 3450.0 / 30.0;
 
     PIDController pivotController;
 
@@ -204,12 +211,13 @@ public class Robot2Teleop extends LinearOpMode {
         DEPOSIT_RETRACT_SET, DEPOSIT_RETRACT, PIVOT_TO_INTAKE,
         PIVOT_TO_DEPOSIT_REVERSE,
 
-        PIVOT_TO_HANG, HANG_ACTIVE,
-        HANG_ABORT,
+        PIVOT_TO_SPECIMEN_GRAB,
+        SPECIMEN_GRAB, SPECIMEN_POSITION, SPECIMEN_PLACE,
+        SPECIMEN_RETRACT,
 
-        PIVOT_TO_STABILIZE_ROBOT, RETRACT_TO_STABILIZE,
+        PIVOT_TO_STABILIZE_ROBOT,
         STABILIZE_ROBOT, 
-        HANG_TIME_AUTOMATIC_HANDS, HANG_TIME_AUTOMATIC_HANDS_ALTERNATE, 
+        HANG_TIME_AUTOMATIC_HANDS, 
         HANG_TIME_AUTOMATIC_ARM, HANG_TIME_AUTOMATIC_ARM_ALTERNATE,
         HANG_TIME_MANUAL,
 
@@ -218,6 +226,10 @@ public class Robot2Teleop extends LinearOpMode {
         PIVOT_MANUAL_RESET
     }
     LinearSlideStates linearSlideState;
+
+    enum ExtensionLimits {
+        INTAKE, DEPOSIT, SPECIMEN, HANG
+    }
 
     ElapsedTime lightTimer, setupTimer, pidTimer, slideTimer;
 
@@ -235,6 +247,7 @@ public class Robot2Teleop extends LinearOpMode {
     boolean overridePID = false;
     boolean camera = false; // disable if camera not in use or if it doesn't exist
     boolean isRunningPivotToPosition = false;
+    boolean specimanning = false;
 
 
 
@@ -309,8 +322,9 @@ public class Robot2Teleop extends LinearOpMode {
 
         boolean isStateInitialized = false;
         boolean isIntakeProtected = false;
+        boolean isGrabberOpen = true;
         boolean isArmPositionSet = true;
-        boolean isGoingToHangTime = false; // True when going to hang from deposit; false otherwise
+        boolean isGoingToHangTime = false; // True when going to hang from deposit or intake; false otherwise
         boolean isExitingHangTime = false; // True when aborting from STABILIZE_ROBOT before PIVOT_TO_INTAKE; false otherwise
 
         // ACTUATOR LOGIC
@@ -334,7 +348,7 @@ public class Robot2Teleop extends LinearOpMode {
             }
 
             // START
-            telemetry.addLine("TELEOP VERSION 2.2.2 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.5.0 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -353,6 +367,8 @@ public class Robot2Teleop extends LinearOpMode {
         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
         int linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
 
+//        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+
         double desiredArmTheta = 0; 
         double desiredArmLength = 0; 
 
@@ -362,6 +378,9 @@ public class Robot2Teleop extends LinearOpMode {
             ascentStabilizer.h = STABILIZER_CONSTANTS.highRungHeight;
             ascentStabilizer.x = STABILIZER_CONSTANTS.distFromBarrier;
             ascentStabilizer.r = STABILIZER_CONSTANTS.hookRadius;
+            
+            linearActuatorRight.setPower(0);
+            linearActuatorLeft.setPower(0);
 
             // BUTTON CHECKS
             if (!gamepad2.right_bumper) checkGTwoRB = false;
@@ -451,7 +470,7 @@ public class Robot2Teleop extends LinearOpMode {
                     if (!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
 
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
 
@@ -465,25 +484,25 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-
                     // SLIDES
 
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
                     // ATTEMPT/DIVIDE SAMPLE
 
                     // attempt to grab a sample (if safe)
+                    // slide exit 312RPM-500
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT &&
-                        linearSlideAvgPosition > 500) {
+                        linearSlideAvgPosition > 350) {
                         checkGTwoRT = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
                     } else if (gamepad2.right_bumper && !checkGTwoRB &&
-                        linearSlideAvgPosition > 500) {
+                        linearSlideAvgPosition > 350) {
                         checkGTwoRB = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
@@ -491,13 +510,14 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.INTAKE_DIVIDE_SAMPLE;
                     }
 
-
-
                     // EXIT INTAKE
 
                     // start sequence to pivot to deposit
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        specimanning = false;
+                        isGoingToHangTime = false;
+
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
 
@@ -508,9 +528,12 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT;
                     }
 
-                    // start sequence to pivot to hang
-                    if(gamepad2.dpad_up && !checkGTwoDUP) {
-                        checkGTwoDUP = true;
+                    // start sequence to pivot to specimen
+                    if (gamepad2.left_bumper && !checkGTwoLB) {
+                        checkGTwoLB = true;
+                        specimanning = true;
+                        isGoingToHangTime = false;
+
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
 
@@ -518,8 +541,24 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
 
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.RETRACT_TO_STABILIZE; 
-                    } 
+                        linearSlideState = LinearSlideStates.INTAKE_RETRACT;
+                    }
+
+                    // begin pivot to hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        specimanning = false;
+                        isGoingToHangTime = true;
+
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+
+                        linearPivotRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                        linearPivotLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.INTAKE_RETRACT;
+                    }
                     break;
 
             // robot attempts to grab a sample
@@ -537,7 +576,7 @@ public class Robot2Teleop extends LinearOpMode {
 
 
                     // SLIDES
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -590,7 +629,7 @@ public class Robot2Teleop extends LinearOpMode {
 
 
                     // SLIDES
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -635,7 +674,7 @@ public class Robot2Teleop extends LinearOpMode {
 
 
                     // SLIDES
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -657,6 +696,24 @@ public class Robot2Teleop extends LinearOpMode {
                     // start sequence to pivot to deposit
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        isGoingToHangTime = false;
+
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+
+                        linearPivotRight.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+                        linearPivotLeft.setZeroPowerBehavior(DcMotor.ZeroPowerBehavior.FLOAT);
+
+                        isStateInitialized = false;
+                        isIntakeProtected = false;
+                        linearSlideState = LinearSlideStates.INTAKE_RETRACT;
+                    }
+
+                    // begin pivot to hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        isGoingToHangTime = true;
+
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
 
@@ -680,7 +737,7 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -722,15 +779,26 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // start exiting right before slide hits 0
                     // (attempts to make transition faster and smoother)
-                    if (linearSlideAvgPosition < 800 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    // slide exit 312RPM-800
+                    if (linearSlideAvgPosition < 570 || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
+
+                        if (specimanning) {
+                            linearSlideState = LinearSlideStates.PIVOT_TO_SPECIMEN_GRAB;
+                        } else if (isGoingToHangTime) {
+                            linearSlideState = LinearSlideStates.PIVOT_TO_STABILIZE_ROBOT;
+                        } else {
+                            // normal mode
+                            linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
+                        }
+
                     }
 
 
                     // ABORT
 
                     // go back to intake if mistaken
+                    // for deposit/intake
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
                         linearSlideRight.setPower(0);
@@ -738,6 +806,27 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
                     }
+
+                    // go back to intake if mistaken
+                    // for specimen
+                    if (gamepad2.left_bumper && !checkGTwoLB) {
+                        checkGTwoLB = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
+                    }
+
+                    // go back to intake if mistaken
+                    // for hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
+                    }
+
                     break;
 
             // move lift from intake mode to deposit mode
@@ -810,7 +899,7 @@ public class Robot2Teleop extends LinearOpMode {
                     }
 
                     // SLIDES
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, false);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.DEPOSIT);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -842,14 +931,16 @@ public class Robot2Teleop extends LinearOpMode {
                     // begin leave of deposit mode
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        isGoingToHangTime = false;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
                     }
 
-                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
-                        checkGTwoLT = true;
-                        isStateInitialized = false;
+                    // begin pivot to hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
                         isGoingToHangTime = true;
+                        isStateInitialized = false;
                         linearSlideState = LinearSlideStates.DEPOSIT_RETRACT_SET;
                     }
 
@@ -882,12 +973,7 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = false;
 
                         // Going to hang time if so told to
-                        if(isGoingToHangTime) {
-                            linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
-                        } else {
-                            isGoingToHangTime = false; // Not needed anymore; set to false to avoid residual hang time
-                            linearSlideState = LinearSlideStates.RETRACT_TO_STABILIZE;
-                        }
+                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
                     }
 
                     // ABORT
@@ -895,6 +981,14 @@ public class Robot2Teleop extends LinearOpMode {
                     // go back to deposit if mistaken
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        pivotPIDSpeedMultiplier = 1.0;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
+                    }
+
+                    // for hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
                         pivotPIDSpeedMultiplier = 1.0;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
@@ -921,9 +1015,15 @@ public class Robot2Teleop extends LinearOpMode {
 
 
                     // exit mode if slide has gone far enough to safely start pivoting
-                    if (linearSlideAvgPosition < 1800 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    // slide exit 312RPM-1800
+                    if (linearSlideAvgPosition < 1280 || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
+
+                        if (!isGoingToHangTime) {
+                            linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
+                        } else {
+                            linearSlideState = LinearSlideStates.PIVOT_TO_STABILIZE_ROBOT;
+                        }
                     }
 
                     // ABORT
@@ -931,6 +1031,18 @@ public class Robot2Teleop extends LinearOpMode {
                     // go back to deposit if mistaken
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        isIntakeProtected = true;
+                        // alternate deposit pivots slightly upon retract set
+                        // must go back to pivoting to deposit to fully reset
+                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
+                    }
+
+                    // for hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
@@ -1045,9 +1157,262 @@ public class Robot2Teleop extends LinearOpMode {
                     break;
 
 
-            // in case everything else fails
-            // NOTE: this state is dangerous
-            // ALSO NOTE: this state is outdated I believe
+            // move from intake to specimen mode, and return from specimen place
+                case PIVOT_TO_SPECIMEN_GRAB:
+                    if (!isStateInitialized) {
+                        linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenGrabPos;
+                        isRunningPivotToPosition = true;
+                        pidTimer.reset();
+
+                        lightTimer.reset();
+                        isIntakeProtected = true;
+                        isArmPositionSet = false;
+                        isStateInitialized = true;
+                    }
+
+
+                    // stop slides once finished retracting
+                    // (slides started retracting in INTAKE_RETRACT)
+                    if (isLinearSlideFullyRetracted(limitSwitch)) {
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isArmPositionSet = true;
+                    } else if (!isArmPositionSet) {
+                        linearSlideRight.setPower(-SLIDE_SPEED);
+                        linearSlideLeft.setPower(-SLIDE_SPEED);
+                    }
+
+
+                    // EXIT
+
+                    // make specimen grab accessible once lift has finished pivoting
+                    // (and once slide has finished retracting)
+                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.specimenGrabPos) < 20 &&
+                            isArmPositionSet) {
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_GRAB;
+                    }
+
+                    // ABORT
+
+                    // go back to intake if mistaken
+                    if (gamepad2.left_bumper && !checkGTwoLB) {
+                        checkGTwoLB = true;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
+                    }
+                    break;
+
+
+            // allows robot to grab specimens from the observation zone wall
+                case SPECIMEN_GRAB:
+                    if (!isStateInitialized) {
+                        // HOLD ON!!!
+                        duckSpinner.setPower(DUCK_VALUES.spinStop);
+
+                        linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenGrabPos;
+                        isRunningPivotToPosition = true;
+                        pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        intakeWheelR.setPower(0);
+                        intakeWheelL.setPower(0);
+
+                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        isGrabberOpen = false;
+                        isStateInitialized = true;
+                    }
+
+
+                    // SERVOS
+
+                    // move specimen grabber from open and close positions
+                    if (gamepad2.right_bumper && !checkGTwoRB) {
+                        checkGTwoRB = true;
+                        if (isGrabberOpen) {
+                            // close grabber
+                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            isGrabberOpen = false;
+                        } else {
+                            // open grabber
+                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            isGrabberOpen = true;
+                        }
+                    }
+
+
+                    // EXIT
+
+                    // pivot to positioning specimen hang once successful grab off wall
+                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                        checkGTwoLT = true;
+                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        isGrabberOpen = false;
+                        isStateInitialized = false;
+//                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+                        linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
+                    }
+
+                    // go back to intake mode
+                    if (gamepad2.left_bumper && !checkGTwoLB) {
+                        checkGTwoLB = true;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
+                    }
+                    break;
+
+
+            // allows robot to position for a specimen hang
+                /*case SPECIMEN_POSITION:
+                    if (!isStateInitialized) {
+                        duckSpinner.setPower(DUCK_VALUES.spinRest);
+
+                        linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenPositionPos;
+                        isRunningPivotToPosition = true;
+                        pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
+
+                        isStateInitialized = true;
+                    }
+
+                    // SLIDES
+
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.SPECIMEN);
+                    linearSlideRight.setPower(linearSlidePower);
+                    linearSlideLeft.setPower(linearSlidePower);
+
+
+                    // EXIT
+
+                    // go to specimen place when positioned correctly for a hang
+                    if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
+                        checkGTwoRT = true;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
+                    }
+
+
+                    // ABORT
+
+                    // go back to specimen grab if mistaken
+                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                        checkGTwoLT = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
+                    }
+
+                    break;*/
+
+
+            // allows robot to hang the specimen on the bar
+                case SPECIMEN_PLACE:
+                    if (!isStateInitialized) {
+                        duckSpinner.setPower(DUCK_VALUES.spinHyperActive);
+
+                        linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenPlacePos;
+                        isRunningPivotToPosition = true;
+                        pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
+
+                        isStateInitialized = true;
+                    }
+
+                    // SERVOS
+
+                    // move specimen grabber from open and close positions
+                    if (gamepad2.right_bumper && !checkGTwoRB) {
+                        checkGTwoRB = true;
+                        if (isGrabberOpen) {
+                            // close grabber
+                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            isGrabberOpen = false;
+                        } else {
+                            // open grabber
+                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            isGrabberOpen = true;
+                        }
+                    }
+
+
+                    // SLIDES
+
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.SPECIMEN);
+                    linearSlideRight.setPower(linearSlidePower);
+                    linearSlideLeft.setPower(linearSlidePower);
+
+
+                    // EXIT
+
+                    // begin shift to grab upon a successful placement
+                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                        checkGTwoLT = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
+                    }
+
+                    // flip back to specimen position if mistaken
+                    /*if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
+                        checkGTwoRT = true;
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+                    }*/
+                    break;
+
+
+            // go back from placing to grabbing specimens
+                case SPECIMEN_RETRACT:
+                    if (!isStateInitialized) {
+                        duckSpinner.setPower(DUCK_VALUES.spinRest);
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+
+                        lightTimer.reset();
+                        isArmPositionSet = false;
+                        isStateInitialized = true;
+                    }
+
+                    // SLIDES
+
+                    // stop slides once finished retracting
+                    if (isLinearSlideFullyRetracted(limitSwitch)) {
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isArmPositionSet = true;
+                    } else if (!isArmPositionSet) {
+                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                        linearSlideRight.setPower(-timeAccel);
+                        linearSlideLeft.setPower(-timeAccel);
+                    }
+
+
+                    // EXIT
+
+                    // go to specimen grab mode once slides have finished retracting
+                    // maybe eventually finish the retract in specimen grab to save time
+                    if (isArmPositionSet) {
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_GRAB;
+                    }
+
+
+                    // ABORT
+                    // nothing currently
+                    break;
+
                 case MANUAL_OVERRIDE: {
 
                     if (!isStateInitialized) {
@@ -1068,7 +1433,7 @@ public class Robot2Teleop extends LinearOpMode {
                     }
 
                     // set power to lift motors
-                    linearSlidePower += calculateSlidePower(linearSlideAvgPosition, true);
+                    linearSlidePower += calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -1142,7 +1507,7 @@ public class Robot2Teleop extends LinearOpMode {
                 }
 
             // reset the pivot manually in case of disconnect
-            // activated by driver 1
+            // activated by driver 1 (dpad right and button x)
                 case PIVOT_MANUAL_RESET:
 
                     if (!isStateInitialized) {
@@ -1216,51 +1581,6 @@ public class Robot2Teleop extends LinearOpMode {
                     break;
 
             
-                case RETRACT_TO_STABILIZE:
-                    if (!isStateInitialized) {
-                        lightTimer.reset();
-                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinStop);
-
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
-                        isStateInitialized = true;
-                    }
-    
-                    if (!limitSwitch) {
-                        final double timeAccel = Math.min((lightTimer.seconds()*2), 1.0);
-                        linearSlideLeft.setPower(-timeAccel);
-                        linearSlideRight.setPower(-timeAccel);
-                    } else {
-                        linearSlideLeft.setPower(0);
-                        linearSlideRight.setPower(0);
-                    }
-    
-                    // EXIT
-    
-                    // start exiting right before slide hits 0
-                    // (attempts to make transition faster and smoother)
-                    if (linearSlideAvgPosition < 200 || isLinearSlideFullyRetracted(limitSwitch)) {
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_TO_STABILIZE_ROBOT;
-                    }
-    
-    
-                    // ABORT
-                    // go back to intake if mistaken
-                    // go back to deposit if mistaken
-                    if (gamepad2.dpad_up && !checkGTwoDUP) {
-                        checkGTwoDUP = true;
-                        linearSlideRight.setPower(0);
-                        linearSlideLeft.setPower(0);
-                        isStateInitialized = false;
-                        isIntakeProtected = true;
-                        // alternate deposit pivots slightly upon retract set
-                        // must go back to pivoting to deposit to fully reset
-                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
-                    }
-                    break;
-        
                 case PIVOT_TO_STABILIZE_ROBOT:
     
                     if (!isStateInitialized) {
@@ -1277,36 +1597,30 @@ public class Robot2Teleop extends LinearOpMode {
     
                         lightTimer.reset();
                         // isIntakeProtected = true;
-                        // isArmPositionSet = false;
+                        isArmPositionSet = false;
                         isStateInitialized = true;
                     }
     
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, false);
-                    linearSlideRight.setPower(linearSlidePower);
-                    linearSlideLeft.setPower(linearSlidePower);
-    
                     // stop slides once finished retracting
-                    // (slides started retracting in INTAKE_RETRACT)
-                    // if (isLinearSlideFullyRetracted(limitSwitch)) {
-                    //     linearSlideRight.setPower(0);
-                    //     linearSlideLeft.setPower(0);
-                    //     linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                    //     linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                    //     linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    //     linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                    //     isArmPositionSet = true;
-                    // } else if (!isArmPositionSet) {
-                    //     linearSlideRight.setPower(-SLIDE_SPEED);
-                    //     linearSlideLeft.setPower(-SLIDE_SPEED);
-                    // }
+                    // (slides started retracting in INTAKE_RETRACT or DEPOSIT_RETRACT)
+                    if (isLinearSlideFullyRetracted(limitSwitch)) {
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                        isArmPositionSet = true;
+                    } else if (!isArmPositionSet) {
+                        linearSlideRight.setPower(-SLIDE_SPEED);
+                        linearSlideLeft.setPower(-SLIDE_SPEED);
+                    }
     
                     // EXIT
     
                     // make deposit accessible once lift has finished pivoting
-                    // Only occurs if the up dpad button has been pressed (to allow for extension)
                     if (
                         Math.abs(linearPivotAvgPosition - linearPivotTargetPosition) < 20
-                        && gamepad2.dpad_up && !checkGTwoDUP
                     ) {
                         checkGTwoDUP = true;
                         isStateInitialized = false;
@@ -1314,8 +1628,9 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
                         if(isExitingHangTime) {
-                            // The exiting sequence if over! Pivot back to intake (uses deposit to reduce code written)
-                            isExitingHangTime = false;
+                            // Pivot back to intake (uses deposit to reduce code written)
+                            isExitingHangTime = false; // Not needed for going to intake, so we end it here.
+                            isGoingToHangTime = false; // Don't accidentally retract back to hanging!!
                             linearSlideState = LinearSlideStates.DEPOSIT_RETRACT; // Put the arm down before going to intake 
                         } else {
                             linearSlideState = LinearSlideStates.STABILIZE_ROBOT; // Get the robot vertical
@@ -1324,15 +1639,15 @@ public class Robot2Teleop extends LinearOpMode {
     
                     // ABORT
                     // go back to intake if mistaken
-                    if (gamepad2.dpad_right && !checkGTwoDRIGHT) {
-                        checkGTwoDRIGHT = true;
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
                         isStateInitialized = false;
                         linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
                     }
                     break;
-    
+
                 case STABILIZE_ROBOT: {
                     // Put the robot into a vertical position with the arm at the ready
                     final double t = lightTimer.seconds();
@@ -1366,17 +1681,10 @@ public class Robot2Teleop extends LinearOpMode {
                     }
     
                     // Moving the arm into position
-                    boolean isCorrectTheta = true;
-                    
-                    
-                    if(Math.abs(linearPivotAvgPosition - radiansToPivotTicks(desiredArmTheta)) > 30) {
-                        linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
-                        isCorrectTheta = false;
-                    }
-                    
-                    boolean isCorrectLength = isCorrectTheta;
+                    // The arm first moves to position length-wise
+                    boolean isCorrectLength = true;
 
-                    if(isCorrectTheta && Math.abs(linearSlideAvgPosition - hookDistInchesToLiftTicks(desiredArmLength)) > 30) {
+                    if(Math.abs(linearSlideAvgPosition - hookDistInchesToLiftTicks(desiredArmLength)) > 30) {
                         linearSlideLeft.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
                         linearSlideRight.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION); // NOTE: May be optional for-- or impeding on-- Java
@@ -1385,7 +1693,20 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideRight.setPower(1.0);
                         isCorrectLength = false;
                     }
+
+                    // The arm only pivots when the arm is in the correct position
+                    boolean isCorrectTheta = isCorrectLength;
+                    
+                    if(isCorrectLength && Math.abs(linearPivotAvgPosition - radiansToPivotTicks(desiredArmTheta)) > 30) {
+                        linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
+                        isCorrectTheta = false;
+                    }
     
+                    if(gamepad2.dpad_down) {
+                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                    }
+
                     telemetry.addLine("----- Stabilize Robot -----");
                     telemetry.addData("t", t);
                     telemetry.addData("y", ascentStabilizer.y(t));
@@ -1412,7 +1733,7 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearPivotRight.setPower(0);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.HANG_TIME_AUTOMATIC_HANDS_ALTERNATE;
+                        linearSlideState = LinearSlideStates.HANG_TIME_AUTOMATIC_HANDS;
                     }
     
                     // ABORT
@@ -1435,106 +1756,6 @@ public class Robot2Teleop extends LinearOpMode {
                 }
     
                 case HANG_TIME_AUTOMATIC_HANDS: {
-                    // Vertically raising the robot for the first portion of a 3rd level ascent
-                    //
-                    // This sets the velocities of the motors based on first derivatives; this may, 
-                    // therefore, become misaligned. To fix in that scenario, just hit the right dpad
-                    // to enter re-stabilization
-                    final double t = lightTimer.seconds();
-                    
-                    ascentStabilizer.update(t);
-    
-                    desiredArmTheta = ascentStabilizer.theta(t);
-                    desiredArmLength = ascentStabilizer.l(t) - STABILIZER_CONSTANTS.drawBack;
-                    final double thetaPrime = ascentStabilizer.thetaPrime(t);
-                    final double lengthPrime = ascentStabilizer.lPrime(t);
-                    final double currentArmTheta = pivotTicksToRadians(linearSlideAvgPosition);
-                    final double currentArmLength = liftTicksToHookDistInches(linearPivotAvgPosition);
-    
-                    // Raise the robot vertically to 3rd level!
-                    if(!isStateInitialized) {
-                        if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinActive);
-
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-                        intakeWheelR.setPower(INTAKE_POWER_ZERO);
-                        intakeWheelL.setPower(INTAKE_POWER_ZERO);
-
-                        lightTimer.reset();
-                        isRunningPivotToPosition = false;
-                        overridePID = true;
-                        ascentStabilizer.firstUpdate = true;
-                        ascentStabilizer.update(t);
-                        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearPivotLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);    
-                        linearPivotRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);    
-                        isStateInitialized = true;
-                    }
-    
-                    linearSlideLeft.setVelocity(inchesToLiftTicks(lengthPrime));
-                    linearSlideRight.setVelocity(inchesToLiftTicks(lengthPrime));
-                    linearPivotLeft.setVelocity(radiansToPivotTicks(thetaPrime));
-                    linearPivotRight.setVelocity(radiansToPivotTicks(thetaPrime));
-    
-                    telemetry.addLine("\n--- Automatic Hang Time ---\n");
-                    telemetry.addData("t", t);
-                    telemetry.addData("y", ascentStabilizer.y(t));
-                    telemetry.addData("deltaY", ascentStabilizer.deltaY(t));
-                    telemetry.addData("desiredArmTheta", desiredArmTheta);
-                    telemetry.addData("desiredArmLength", desiredArmLength);
-                    
-                    telemetry.addLine("");
-                    telemetry.addData("deltaY", ascentStabilizer.deltaY(t));
-                    telemetry.addData("yPrime", ascentStabilizer.yPrime(t));
-                    telemetry.addData("lengthPrime", lengthPrime);
-                    telemetry.addData("thetaPrime", thetaPrime);
-    
-                    telemetry.addLine("");
-                    telemetry.addData("current armTheta", currentArmTheta);
-                    telemetry.addData("current length", currentArmLength);
-    
-                    // EXIT
-                    // // Code is disabled to prevent accidental dropping of the robot 🫣
-                    // if(gamepad2.dpad_up && !checkGTwoDUP) {
-                    //     linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                    //     linearSlideLeft.setPower(0);
-                    //     linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                    //     linearSlideRight.setPower(0);
-                    //     linearPivotLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                    //     linearPivotLeft.setPower(0);
-                    //     linearPivotRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                    //     linearPivotRight.setPower(0);
-                        
-                    //     checkGTwoDUP = true;
-                    //     linearPivotTargetPosition = linearPivotLeft.getCurrentPosition();
-                    //     isRunningPivotToPosition = true;
-                    //     overridePID = false;
-                    //     isStateInitialized = false;
-                    //     linearSlideState = LinearSlideStates.EXIT_HANG_TIME;
-                    // }
-    
-                    // Restabilize the robot to remove additive error from adding only *velocities*
-                    if(gamepad2.dpad_right && !checkGTwoDRIGHT) {
-                        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearSlideLeft.setPower(0);
-                        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearSlideRight.setPower(0);
-                        linearPivotLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearPivotLeft.setPower(0);
-                        linearPivotRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
-                        linearPivotRight.setPower(0);
-                        
-                        checkGTwoDRIGHT = true;
-                        isRunningPivotToPosition = true;
-                        overridePID = false;
-                        isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.STABILIZE_ROBOT;
-                    }
-    
-                    break;
-                }
-                
-                case HANG_TIME_AUTOMATIC_HANDS_ALTERNATE: {
                     // Vertically raising the robot for the first portion of a 3rd level ascent
                     //
                     // This uses RUN_TO_POSITION to maintain the position of the motors; this may,
@@ -1567,6 +1788,11 @@ public class Robot2Teleop extends LinearOpMode {
     
                     linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
     
+                    if(gamepad2.dpad_down) {
+                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                    }
+
                     telemetry.addLine("--- Automatic Hang Time (Alternate ~ Position) ---");
                     telemetry.addData("t", t);
                     telemetry.addData("y", ascentStabilizer.y(t));
@@ -1626,7 +1852,7 @@ public class Robot2Teleop extends LinearOpMode {
                     }
                     
                     // Powering the arm
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, false);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.HANG);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -1671,7 +1897,7 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, false);
+                    linearSlidePower = calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.HANG);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -1743,22 +1969,25 @@ public class Robot2Teleop extends LinearOpMode {
 
             // get the hands to the relative correct position for hanging
             // there is a safety to lower in case things go wrong (default case)
-            
-            linearActuatorRight.setPower(0);
-            linearActuatorLeft.setPower(0);
-            
-            if (gamepad2.dpad_down) {
+            if (gamepad2.dpad_left) {
                 // lower actuators manually to reset in case of malfunction
                 linearActuatorRight.setPower(-ACTUATOR_SPEED);
                 linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                isActuatorInitialized = true;
-            }
-            
-            if (!isActuatorInitialized && setupTimer.seconds() <= 12.0) {
+                setupTimer.reset();
+                isActuatorInitialized = false;
+
+            } else if (!isActuatorInitialized) {
 
                 // apply power to move actuators up for a set amount of time
                 linearActuatorRight.setPower(ACTUATOR_SPEED);
                 linearActuatorLeft.setPower(ACTUATOR_SPEED);
+
+                // exit since it is guessed that the servos are at the right position for ascent
+                if (setupTimer.seconds() > 12.0) {
+                    linearActuatorRight.setPower(0);
+                    linearActuatorLeft.setPower(0);
+                    isActuatorInitialized = true;
+                }
             }
 
 
@@ -1876,6 +2105,7 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Intake WR POW", intakeWheelR.getPower());
             telemetry.addData("Intake WL POW", intakeWheelL.getPower());
             telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
+            telemetry.addData("Specimen POS", specimenGrabber.getPosition());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("SENSORS");
@@ -1888,6 +2118,11 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
             telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
             telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+            telemetry.addLine("-------------------------");
+
+            telemetry.addLine("LOGIC");
+            telemetry.addData("Specimanning", specimanning);
+            telemetry.addData("Hanging", isGoingToHangTime);
             telemetry.addLine("-------------------------");
 
 
@@ -1933,14 +2168,15 @@ public class Robot2Teleop extends LinearOpMode {
     }
 
 
+
     /**
      * Determines what power to apply to the slides specified by the mode the lift is in. <br>
      * Utilizes a cushion effect to prevent over-extension.
      * @param linearSlidePosition current position of the slide
-     * @param intake use extension cushion for intake, or deposit
+     * @param limit which extension limit cushion to use
      * @return a correct and safe power that can be applied to the linear slide motor
      */
-    private double calculateSlidePower(double linearSlidePosition, boolean intake) {
+    private double calculateSlidePower(double linearSlidePosition, ExtensionLimits limit) {
         double linearSlidePower = 0;
         double linearSlideCushion = 1;
 
@@ -1949,15 +2185,22 @@ public class Robot2Teleop extends LinearOpMode {
 //        if ((-gamepad2.right_stick_y) < 0.01 && (-gamepad2.right_stick_y) > -0.01) slideTimer.reset();
 
         // determine the cushion for the linear slide so robot does not exceed extension limit
-        if (intake) {
-            // intake
-            linearSlideCushion = (SLIDE_CONSTANTS.extensionLimitIntake - linearSlidePosition)
-                    /SLIDE_CONSTANTS.cushionRatio;
-        } else {
-            // alternate deposit
-            linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeightAlternate - linearSlidePosition)
-                    /SLIDE_CONSTANTS.cushionRatio;
+        switch (limit) {
+            case INTAKE:
+                linearSlideCushion = (SLIDE_CONSTANTS.extensionLimitIntake - linearSlidePosition)
+                        /SLIDE_CONSTANTS.cushionRatio;
+                break;
+
+            case HANG:
+            case DEPOSIT:
+                linearSlideCushion = (SLIDE_CONSTANTS.topBucketHeightAlternate - linearSlidePosition)
+                        /SLIDE_CONSTANTS.cushionRatio;
+                break;
+
+            case SPECIMEN:
+                break;
         }
+
 
         // determine whether to apply the cushion or ignore it
         if ((-gamepad2.right_stick_y) > 0) {
@@ -1969,13 +2212,18 @@ public class Robot2Teleop extends LinearOpMode {
         }
 
         // for deposit only
-        if (!intake) {
+        if (limit == ExtensionLimits.DEPOSIT || limit == ExtensionLimits.SPECIMEN) {
             // make descent of slides slightly slower so it is not jarring
             if ((-gamepad2.right_stick_y) < 0) {
                 linearSlidePower*=0.9;
             }
-            // apply a coefficient to fight gravity
+            // apply a coefficient to fight gravity (slide holds power to extend)
             linearSlidePower+=SLIDE_CONSTANTS.gravityCoefficient;
+        }
+
+        if (limit == ExtensionLimits.HANG) {
+            // apply a coefficient to fight gravity (slide holds power to retract)
+            linearSlidePower-=SLIDE_CONSTANTS.gravityCoefficient;
         }
 
         // calculate acceleration
@@ -1984,6 +2232,7 @@ public class Robot2Teleop extends LinearOpMode {
 
         return linearSlidePower;
     }
+
 
 
     /**
@@ -2013,13 +2262,14 @@ public class Robot2Teleop extends LinearOpMode {
         double pivotFF = Math.cos(Math.toRadians(pivotPosition / PIVOT_TICKS_PER_DEGREE + 1)) * PIVOT_CONSTANTS.gravityFeedForward;
 
         // set power
-        pivotPower = (-gamepad2.left_stick_y)*PIVOT_SPEED*pivotCushion;
+        pivotPower = (-gamepad2.left_stick_y)*(PIVOT_SPEED*0.7)*pivotCushion;
 
         // apply a factor to fight gravity if needed (works and doesn't work at the same time)
         // note that this does not account for the added load due to lever action
-        if (pivotPosition > 200) {
-            pivotPower += pivotFF;
-        }
+//        if (pivotPosition > 100) {
+//            pivotPower += pivotFF;
+//        }
+        pivotPower += pivotFF;
 
         return pivotPower;
     }
@@ -2094,6 +2344,8 @@ public class Robot2Teleop extends LinearOpMode {
         intakePivot = hardwareMap.get(Servo.class, "intakePivot");
 
         duckSpinner = hardwareMap.get(CRServo.class, "duckSpinner");
+
+        specimenGrabber = hardwareMap.get(Servo.class, "specimenGrabber");
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
