@@ -24,7 +24,7 @@ import org.firstinspires.ftc.teamcode.teamprograms.DistanceGetter;
 
 /**
  * Welcome!
- * Teleop Version: 2.5.0 RELEASE
+ * Teleop Version: 2.6.0 RELEASE
  * STARTING POSITION/STATE: INTAKE_ACTIVE
  **/
 
@@ -201,6 +201,13 @@ public class Robot2Teleop extends LinearOpMode {
 
     PIDController pivotController;
 
+    public static class TimeConstants {
+        public double handsInit = 12.0;
+        public double handsDown = 5.0; // should be equal to handsDown
+        public double handsUp = 5.0; // should be equal to handsUp
+    }
+    public static TimeConstants TIME_CONSTANTS = new TimeConstants();
+
     // ROBOT LIFT STATES
     enum LinearSlideStates {
 
@@ -231,7 +238,18 @@ public class Robot2Teleop extends LinearOpMode {
         INTAKE, DEPOSIT, SPECIMEN, HANG
     }
 
-    ElapsedTime lightTimer, setupTimer, pidTimer, slideTimer;
+    enum ActuatorHangStates {
+        HANDS_INITIALIZE,
+        HANDS_UP, HANDS_DOWN,
+        HANDS_AT_REST,
+        HANDS_RESET
+    }
+    ActuatorHangStates actuatorHangState;
+    double storedActuatorTime = 0.0;
+    boolean isRobot2ndLevelAscending = false;
+
+
+    ElapsedTime lightTimer, actuatorTimer, pidTimer;
 
     AscentStabilizer ascentStabilizer = new AscentStabilizer(heightGetter);
 
@@ -314,9 +332,8 @@ public class Robot2Teleop extends LinearOpMode {
         boolean checkGOneBACK = true;
 
         lightTimer = new ElapsedTime();
-        setupTimer = new ElapsedTime();
+        actuatorTimer = new ElapsedTime();
         pidTimer = new ElapsedTime();
-        slideTimer = new ElapsedTime();
 
         // STATE MACHINE LOGIC
 
@@ -328,14 +345,14 @@ public class Robot2Teleop extends LinearOpMode {
         boolean isExitingHangTime = false; // True when aborting from STABILIZE_ROBOT before PIVOT_TO_INTAKE; false otherwise
 
         // ACTUATOR LOGIC
-        boolean isActuatorInitialized = false;
+        boolean isActuatorStateInitialized = false;
+//        boolean isActuatorInitialized = false;
 
         // WAIT LOOP ----------------------------------------------------------------------------
 
         lightTimer.startTime();
-        setupTimer.startTime();
+        actuatorTimer.startTime();
         pidTimer.startTime();
-        slideTimer.startTime();
 
 
         while (opModeInInit()) {
@@ -347,8 +364,9 @@ public class Robot2Teleop extends LinearOpMode {
                 tankDrive = false;
             }
 
+
             // START
-            telemetry.addLine("TELEOP VERSION 2.5.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.6.0 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -361,9 +379,8 @@ public class Robot2Teleop extends LinearOpMode {
         waitForStart();
 
         lightTimer.reset();
-        setupTimer.reset();
+        actuatorTimer.reset();
         pidTimer.reset();
-        slideTimer.reset();
         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
         int linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
 
@@ -1619,9 +1636,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // EXIT
     
                     // make deposit accessible once lift has finished pivoting
-                    if (
-                        Math.abs(linearPivotAvgPosition - linearPivotTargetPosition) < 20
-                    ) {
+                    if (Math.abs(linearPivotAvgPosition - linearPivotTargetPosition) < 20) {
                         checkGTwoDUP = true;
                         isStateInitialized = false;
                         linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
@@ -1969,11 +1984,12 @@ public class Robot2Teleop extends LinearOpMode {
 
             // get the hands to the relative correct position for hanging
             // there is a safety to lower in case things go wrong (default case)
-            if (gamepad2.dpad_left) {
+            // OLD
+            /*if (gamepad2.dpad_left) {
                 // lower actuators manually to reset in case of malfunction
                 linearActuatorRight.setPower(-ACTUATOR_SPEED);
                 linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                setupTimer.reset();
+                actuatorTimer.reset();
                 isActuatorInitialized = false;
 
             } else if (!isActuatorInitialized) {
@@ -1983,12 +1999,161 @@ public class Robot2Teleop extends LinearOpMode {
                 linearActuatorLeft.setPower(ACTUATOR_SPEED);
 
                 // exit since it is guessed that the servos are at the right position for ascent
-                if (setupTimer.seconds() > 12.0) {
+                if (actuatorTimer.seconds() > 12.0) {
                     linearActuatorRight.setPower(0);
                     linearActuatorLeft.setPower(0);
                     isActuatorInitialized = true;
                 }
-            }
+            }*/
+
+
+
+            // used in combination with stored and running time for actuators
+            double handTime = 0;
+
+            switch (actuatorHangState) {
+                // moves hands up to correct position upon initialization
+                // and whenever hands are reset
+                case HANDS_INITIALIZE:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                        storedActuatorTime = 0;
+                        actuatorTimer.reset();
+                        isActuatorStateInitialized = true;
+                    }
+
+                    // EXIT
+
+                    // go to rest
+                    if (actuatorTimer.seconds() > TIME_CONSTANTS.handsInit) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+                    break;
+
+
+            // move hands up to ready to hang
+                case HANDS_UP:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                        actuatorTimer.reset();
+                        isActuatorStateInitialized = true;
+                    }
+
+                    handTime = actuatorTimer.seconds() + storedActuatorTime;
+
+                    // EXIT
+
+                    // stop hands once they have presumably gone up far enough
+                    if (handTime > TIME_CONSTANTS.handsUp) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+                    // ABORT
+
+                    // go to hands down if canceled
+                    if (gamepad1.dpad_up && !checkGOneDUP) {
+                        checkGOneDUP = true;
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        storedActuatorTime = handTime;
+                        isRobot2ndLevelAscending = false; // going down!
+                        actuatorHangState = ActuatorHangStates.HANDS_DOWN;
+                    }
+                    break;
+
+            // move hands down to hang
+                case HANDS_DOWN:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                        actuatorTimer.reset();
+                        isActuatorStateInitialized = true;
+                    }
+
+                    handTime = actuatorTimer.seconds() + storedActuatorTime;
+
+                    // EXIT
+
+                    // stop hands once they have presumably gone down far enough
+                    if (handTime > TIME_CONSTANTS.handsDown) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
+                    }
+
+                    // ABORT
+
+                    // go to hands up if canceled
+                    if (gamepad1.dpad_up && !checkGOneDUP) {
+                        checkGOneDUP = true;
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        storedActuatorTime = handTime;
+                        isRobot2ndLevelAscending = false; // going up!
+                        actuatorHangState = ActuatorHangStates.HANDS_UP;
+                    }
+                    break;
+
+
+                case HANDS_AT_REST:
+                    if (!isActuatorStateInitialized) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        storedActuatorTime = 0;
+                        isActuatorStateInitialized = true;
+                    }
+
+                    // EXIT
+
+                    // currently set up with driver 1 controls as backup
+
+                    // move hands to and from hanging
+                    if (gamepad1.dpad_up && !checkGOneDUP) {
+                        checkGOneDUP = true;
+
+                        if (!isRobot2ndLevelAscending) {
+                            isRobot2ndLevelAscending = true;
+                            isActuatorStateInitialized = false;
+                            actuatorHangState = ActuatorHangStates.HANDS_DOWN;
+                        } else {
+                            isRobot2ndLevelAscending = false;
+                            isActuatorStateInitialized = false;
+                            actuatorHangState = ActuatorHangStates.HANDS_UP;
+                        }
+                    }
+                    break;
+
+
+                case HANDS_RESET:
+                    if (!isActuatorStateInitialized) {
+                        isRobot2ndLevelAscending = false;
+                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                        isActuatorStateInitialized = true;
+                    }
+
+
+                    // EXIT
+                    // stop moving actuators down once button is let go
+                    // (goes back to initialization stage)
+                    if (!gamepad1.dpad_left) {
+                        linearActuatorRight.setPower(0);
+                        linearActuatorLeft.setPower(0);
+                        isActuatorStateInitialized = false;
+                        actuatorHangState = ActuatorHangStates.HANDS_INITIALIZE;
+                    }
+                    break;
+            } // end actuator switch statement
 
 
 
