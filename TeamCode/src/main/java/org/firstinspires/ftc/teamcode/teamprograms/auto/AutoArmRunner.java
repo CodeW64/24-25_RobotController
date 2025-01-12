@@ -70,7 +70,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
  */
 
 @Config
-// @Disabled
+@Disabled
 @TeleOp(name="AutoArmRunner Test Suite", group="teamprograms")
 public class AutoArmRunner extends LinearOpMode {
     protected boolean isTelemetrySuppresed = false;

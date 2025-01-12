@@ -215,10 +215,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * @return Whether the slides have fully pivoted
          */
         public boolean hasFinishedPivot() {
-            return linearSlideState.equals(AutoArmRunner.LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE)
-                || linearSlideState.equals(AutoArmRunner.LinearSlideStates.DEPOSIT_ACTIVE)
-                || linearSlideState.equals(AutoArmRunner.LinearSlideStates.INTAKE_ACTIVE)
-                || linearSlideState.equals(AutoArmRunner.LinearSlideStates.INTAKE_FULL);
+            return linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE)
+                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE)
+                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_ACTIVE)
+                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_FULL);
         }
 
         /**
@@ -226,7 +226,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          */
         public void switchArmMode() {
             // SEt and set initial conditions
-            final AutoArmRunner.LinearSlideStates intialState = linearSlideState; 
+            final AutoArmRunner2.LinearSlideStates intialState = linearSlideState; 
             final boolean initialStateIsDeposit = isDepositPosition(linearSlideState);
             setIsSwitching(true);
             hasStartedSwitch = true;
@@ -273,7 +273,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             final ConditionalThread armSwitcher = new ConditionalThread();
 
             buttonPresser.finishInitialization(
-                () -> linearSlideState.equals(AutoArmRunner.LinearSlideStates.PIVOT_TO_CHAMBER), 
+                () -> linearSlideState.equals(AutoArmRunner2.LinearSlideStates.PIVOT_TO_CHAMBER), 
                 (Boolean unusedParam) -> {
                     gamepad2.left_trigger = 0;
                     gamepad2.dpad_left = false;
@@ -663,7 +663,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      */
     private void extendToBucketsAsync() {
         lift.extendSlides(
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
+            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
             10, 
             EXTENSION_POWER
         );
@@ -672,7 +672,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private void extendToBucketsSync() {
         AutoInit.driveMotorTo(
             linearSlideLift,
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
+            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
             10, 
             EXTENSION_POWER
         );

@@ -482,7 +482,7 @@ public class SamplePreloadBasket extends AutoCommonPaths {
      */
     private void extendToBucketsAsync() {
         lift.extendSlides(
-           (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeight, 
+           (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeight, 
            10, 
            0.2
         );

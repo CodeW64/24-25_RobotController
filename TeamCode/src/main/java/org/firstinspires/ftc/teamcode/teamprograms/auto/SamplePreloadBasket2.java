@@ -645,7 +645,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      */
     private void extendToBucketsAsync() {
         lift.extendSlides(
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
+            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
             10, 
             EXTENSION_POWER
         );
@@ -654,7 +654,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     private void extendToBucketsSync() {
         AutoInit.driveMotorTo(
             linearSlideLift,
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
+            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
             10, 
             EXTENSION_POWER
         );

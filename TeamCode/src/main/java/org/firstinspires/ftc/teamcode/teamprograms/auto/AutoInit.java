@@ -15,7 +15,7 @@ import com.qualcomm.robotcore.hardware.IMU;
  * 
  * <p> The class extends a 
  */
-abstract public class AutoInit extends AutoArmRunner {
+abstract public class AutoInit extends AutoArmRunner2 {
     /** 
      * Arbitrary value to make motors more controllable.
      */
