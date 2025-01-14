@@ -36,6 +36,8 @@ import com.acmerobotics.roadrunner.ftc.Actions;
 import java.util.function.DoubleConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
+import java.util.function.Function;
 
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
@@ -88,12 +90,24 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private double sampleSensingDistance;
 
     private int CHAMBER_EXTENSION = 2500;
-    private int TWELVE_INCHES_EXTENSION = 1670;
-    private int FULLY_RETRACTED = 600;
+    private int EXTEND_TO_SAMPLE_EXTENSION = 1377;
+    private int FULLY_RETRACTED = 0;
     
     private double EXTENSION_POWER = 1.0; // Previously 0.15
     private double RETRACTION_POWER = -1.0; // Previous -0.4
     private boolean isTime = false; // DEV: This is exists for debuggin telemetry
+
+    public static interface ThreadIdentifiers {
+            public static enum Type { UNKNOWN, EXTENSION, SWITCH }
+
+            public final static Type UNKNOWN = Type.UNKNOWN;
+            public final static Type EXTENSION = Type.EXTENSION;
+            public final static Type SWITCH = Type.SWITCH;
+
+            public Type getType();
+
+            public String getName();
+    }
 
     /**
      * Contains methods so that the arm can be managed from outside the teleop, 
@@ -124,72 +138,56 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * @param tolerance The maximum allowed differnece between the target 
          *     and the motor's end position. The difference is absolute, so the 
          *     size of the allowed range is equal to 2 * tolerance. 
-         * @param power How powerful the motor should be run. Positive values 
-         *     extend, negative retract.
+         * @param power How powerful the motor should be run. 
          */
         public void extendSlides(int target, int tolerance, double power) {
+            if(getIsExtending()) {
+                // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
+                for(final ConditionalThread thread : runningThreads) {
+                    if(thread.identifiers.getType() == ThreadIdentifiers.EXTENSION) {
+                        thread.close();
+                        runningThreads.remove(thread);
+                    }
+                }
+            }
+            
             setIsExtending(true);
-            final ConditionalThread conditionalThread = new ConditionalThread();
-            conditionalThread.finishInitialization(
-                () -> Math.abs(linearSlideLift.getCurrentPosition() - target) <= tolerance,
+            // TODO: Add id's to the threads? 
+            final ConditionalThread extensionThread = new ConditionalThread(new ThreadIdentifiers() {
+                public Type getType() {
+                   return ThreadIdentifiers.EXTENSION; 
+                }
+
+                public String getName() {
+                    return "Extension.extensionThread";
+                }
+            });
+            
+            extensionThread.finishInitialization(
+                () -> Math.abs(getLinearSlideAvgPosition() - target) <= tolerance,
                 (Boolean unusedParam) -> {
                     // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
-                    driveSlidesTo(target, tolerance, power);
+                    linearSlideLeft.setTargetPosition(target);
+                    linearSlideLeft.setTargetPositionTolerance(tolerance);
+                    linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                    linearSlideLeft.setPower(power);
+
+                    linearSlideRight.setTargetPosition(target);
+                    linearSlideRight.setTargetPositionTolerance(tolerance);
+                    linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                    linearSlideRight.setPower(power);
                 },
                 (Boolean unusedParam) -> {
-                    gamepad2.right_stick_y = 0;
+                    linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                    linearSlideLeft.setPower(0);
+                    linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                    linearSlideRight.setPower(0);
                     setIsExtending(false);
                     runningThreads.remove(conditionalThread);
                 }
             );
-            runningThreads.add(conditionalThread);
-            conditionalThread.start();
-        }
-
-        
-        /**
-         * Rotates the given motor at a given power until the target is reached, 
-         * with some tolerance. A motor encoder must be connected to the motor for 
-         * this method to work.
-         * 
-         * @param motor the motor to drive.
-         * @param tickTarget Where to rotate to.
-         * @param tolerance The maximum allowed differnece between the target 
-         *     and the motor's end position. The difference is absolute, so the 
-         *     size of the allowed range is equal to 2 * tolerance. 
-         * @param power How powerful the motor should be run. Positive values 
-         *     extend, negative retract.
-         */
-        private void driveSlidesTo(int tickTarget, int tolerance, double power) {
-            double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
-
-            while(Math.abs(linearSlideLift.getCurrentPosition() - tickTarget) > tolerance) {
-                if((tickTarget - linearSlideLift.getCurrentPosition()) / (reverseFactor * power) < 0) {
-                    reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed 
-                }
-                gamepad2.right_stick_y = (float) (-reverseFactor * power);
-                
-                // DEV START: The data log for debugging the sample pause
-                if(isTime) {
-                    telemetry.clear();
-                    telemetry.addData("pivot_pos", linearSlidePivot.getCurrentPosition());
-                    telemetry.addData("reverse_factor", reverseFactor);
-                    telemetry.addLine();
-                    telemetry.addData("target", tickTarget);
-                    telemetry.addData("current", linearSlideLift.getCurrentPosition());
-                    telemetry.addData("| target - lift-pos |", Math.abs(linearSlideLift.getCurrentPosition() - tickTarget));
-                    telemetry.addData("tolerance", tolerance);
-                    telemetry.update();
-                }
-                // DEV END
-            }
-
-            // DEV START: Final data log for the debugging sample pause
-            if(isTime) {
-                telemetry.addLine("Finished the thing");
-            }
-            // DEV END
-            gamepad2.right_stick_y = 0; // Stop the motor from continuing
+            runningThreads.add(extensionThread);
+            extensionThread.start();
         }
 
         /**
@@ -200,12 +198,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * @return Boolean describing wether it is accurate to call the state a 
          *     deposit state.
          */
-        public boolean isDepositPosition(AutoArmRunner.LinearSlideStates state) {
-            return state == AutoArmRunner.LinearSlideStates.DEPOSIT_ACTIVE
-                || state == AutoArmRunner.LinearSlideStates.DEPOSIT_RETRACT_SET
-                || state == AutoArmRunner.LinearSlideStates.DEPOSIT_RETRACT
-                || state == AutoArmRunner.LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE
-                || state == AutoArmRunner.LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
+        public boolean isDepositPosition(AutoArmRunner2.LinearSlideStates state) {
+            return state == AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE
+                || state == AutoArmRunner2.LinearSlideStates.PIVOT_TO_DEPOSIT
+                || state == AutoArmRunner2.LinearSlideStates.DEPOSIT_RETRACT
+                || state == AutoArmRunner2.LinearSlideStates.DEPOSIT_RETRACT_SET;
         }
         
         /**
@@ -215,8 +212,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * @return Whether the slides have fully pivoted
          */
         public boolean hasFinishedPivot() {
-            return linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE)
-                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE)
+            return linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE)
                 || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_ACTIVE)
                 || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_FULL);
         }
@@ -225,6 +221,16 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * Toggles the arm between an intake position and a deposit position.
          */
         public void switchArmMode() {
+            if(getIsSwitching()) {
+                // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
+                for(final ConditionalThread thread : runningThreads) {
+                    if(thread.identifiers.getType() == ThreadIdentifiers.SWITCH) {
+                        thread.close();
+                        runningThreads.remove(thread);
+                    }
+                }
+            }
+
             // SEt and set initial conditions
             final AutoArmRunner2.LinearSlideStates intialState = linearSlideState; 
             final boolean initialStateIsDeposit = isDepositPosition(linearSlideState);
@@ -232,8 +238,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             hasStartedSwitch = true;
             
             // Initialize the process for switiching
-            final ConditionalThread buttonPresser = new ConditionalThread();
-            final ConditionalThread armSwitcher = new ConditionalThread();
+            // TODO: Add id's to the threads? 
+            final ConditionalThread buttonPresser = new ConditionalThread("switchArmMode.buttonPresser", ThreadIdentifiers.SWITCH);
+            final ConditionalThread armSwitcher = new ConditionalThread("switchArmMode.armSwitcher", ThreadIdentifiers.SWITCH);
 
             buttonPresser.finishInitialization(
                 () -> isDepositPosition(linearSlideState) != initialStateIsDeposit, 
@@ -269,11 +276,15 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             hasStartedSwitch = false;
             
             // Initialize the process for switiching
-            final ConditionalThread buttonPresser = new ConditionalThread();
-            final ConditionalThread armSwitcher = new ConditionalThread();
+            // TODO: Add id's to the threads? 
+
+            final ConditionalThread buttonPresser = new ConditionalThread("switchToChamber.buttonPresser", ThreadIdentifiers.SWITCH);
+            final ConditionalThread armSwitcher = new ConditionalThread("switchToChamber.armSwithcer", ThreadIdentifiers.SWITCH);
 
             buttonPresser.finishInitialization(
-                () -> linearSlideState.equals(AutoArmRunner2.LinearSlideStates.PIVOT_TO_CHAMBER), 
+                () -> 
+                    linearSlideState.equals(AutoArmRunner2.LinearSlideStates.SPECIMEN_POSITION) 
+                    && Math.abs(getLinearPivotAvgPosition() - PIVOT_CONSTANTS.specimenPositionPos) < 20, 
                 (Boolean unusedParam) -> {
                     gamepad2.left_trigger = 0;
                     gamepad2.dpad_left = false;
@@ -297,6 +308,17 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             gamepad2.left_trigger = 1.0f;
             gamepad2.dpad_left = true;
             buttonPresser.start();
+        }
+
+        public void print() {
+            telemetry.addLine("---------- Lift Handler Threads --------");
+            telemetry.addData("All running threads", runningThreads.size());
+            telemetry.addLine("All running threads:");
+
+            // logging all the data
+            for(final ConditionalThread thread : runningThreads) {
+                telemetry.addLine("  " + thread.identifiers.getName());
+            }
         }
 
         @Override
@@ -387,9 +409,28 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         private Consumer<Boolean> onContinue = (Boolean unusedParam) -> {/* NOOP */};
         private Consumer<Boolean> onFinish;
         private boolean isOpen = true;
+        public ThreadIdentifiers identifiers;
 
         public ConditionalThread() {
             super();
+        }
+        
+        public ConditionalThread(String name, ThreadIdentifiers.Type type) {
+            super();
+            this.identifiers = new ThreadIdentifiers() {
+                public ThreadIdentifiers.Type getType() {
+                    return type;
+                }
+
+                public String getName() {
+                    return name;
+                }
+            };
+        }
+
+        public ConditionalThread(ThreadIdentifiers identifiers) {
+            super();
+            this.identifiers = identifiers;
         }
 
         public ConditionalThread(BooleanSupplier condition, Consumer<Boolean> onFinish) {
@@ -456,8 +497,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
                 onFinish.accept(!condition.getAsBoolean());
             } catch(InterruptedException err) {
-                telemetry.addData("!!CAUGHT ERR", err.getMessage());
-                telemetry.update();
+                telemetry.addData("Interupted Running Conditional Thread: ", err.getMessage());
             }
         }
     
@@ -501,10 +541,6 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         
         // Initializing other hardware(-ish) bits
         globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
-        linearSlideLift = hardwareMap.get(DcMotorEx.class, "linearSlideLift");
-        linearSlidePivot = hardwareMap.get(DcMotorEx.class, "linearSlidePivot");
-        linearSlideLift.setDirection(DcMotorEx.Direction.REVERSE);
-        linearSlidePivot.setDirection(DcMotorEx.Direction.REVERSE);
         sampleSensingDistance = hardwareMap
             .get(ColorRangeSensor.class, "sampleSensor")
             .getDistance(DistanceUnit.CM);
@@ -519,10 +555,6 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 isBlue = !isBlue;
                 neutralTagId = isBlue ? AprilLocater.NEUTRAL_BLUE_ID : AprilLocater.NEUTRAL_RED_ID;
                 coloredTagId = isBlue ? AprilLocater.COLORED_BLUE_ID : AprilLocater.COLORED_RED_ID;
-            });
-
-            toggleObservationPark = new ButtonPressHandler(gamepad1, "b", (Gamepad g) -> {
-                shouldParkObservation = !shouldParkObservation;
             });
             
             repositionToggle = new ButtonPressHandler(gamepad1, "start", (Gamepad g) -> {
@@ -552,26 +584,12 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         telemetry.addLine("");
         telemetry.addLine("==== OPTION CONTROLS ====");
         telemetry.addData("Toggle Blue Side", "Press " + toggleBlueSide.getButtonName());
-        telemetry.addData("Toggle Observation Park", "Press " + toggleObservationPark.getButtonName());
         telemetry.addData("Respoition Toggle", "Press " + repositionToggle.getButtonName());
-        telemetry.addData("Lower Arm Start", "Hold dpad_down");
-        telemetry.addData("Lower Arm Start", "Hold dpad_up");
 
         // Detecting buttonPresses
         try {
             toggleBlueSide.activateIfPressed();
-            toggleObservationPark.activateIfPressed();
             repositionToggle.activateIfPressed();
-
-            if(!gamepad1.dpad_down && gamepad1.dpad_up && linearSlidePivot != null) {
-                // Raise the pivot
-                linearSlidePivot.setPower(0.8);
-            } else if(gamepad1.dpad_down && !gamepad1.dpad_up && linearSlidePivot != null) {
-                // Lower the pivot
-                linearSlidePivot.setPower(-0.8);
-            } else if(linearSlidePivot != null) {
-                linearSlidePivot.setPower(0);
-            }
         } catch(IllegalAccessException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err.getMessage());
         }
@@ -579,6 +597,26 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         if(repositionEnabled) {
             driveWheels();
         }
+    }
+
+    private void driveLiftTo(int target, int tolerance, double power) {
+        while(Math.abs(getLinearSlideAvgPosition() - target) > tolerance) {
+            // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+            linearSlideLeft.setTargetPosition(target);
+            linearSlideLeft.setTargetPositionTolerance(tolerance);
+            linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideLeft.setPower(power);
+
+            linearSlideRight.setTargetPosition(target);
+            linearSlideRight.setTargetPositionTolerance(tolerance);
+            linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideRight.setPower(power);
+        }
+
+        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        linearSlideLeft.setPower(0);
+        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        linearSlideRight.setPower(0);
     }
 
     /**
@@ -590,16 +628,14 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void extendAsync() throws InterruptedException {
-        lift.extendSlides(TWELVE_INCHES_EXTENSION, 10, EXTENSION_POWER);
+        lift.extendSlides(EXTEND_TO_SAMPLE_EXTENSION, 10, EXTENSION_POWER);
     }
 
     private void extendSync(int offset) {
-        AutoInit.driveMotorTo(
-            linearSlideLift, 
-            TWELVE_INCHES_EXTENSION + offset, 
-            10, 
-            EXTENSION_POWER
-        );
+        final int target = EXTEND_TO_SAMPLE_EXTENSION + offset;
+        final int tolerance = 20;
+        final double power = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, power);
     }
 
     /**
@@ -615,12 +651,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     }
 
     private void retractSync() {
-        AutoInit.driveMotorTo(
-            linearSlideLift,
-            FULLY_RETRACTED, 
-            30, 
-            RETRACTION_POWER
-        );
+        final int target = FULLY_RETRACTED;
+        final int tolerance = 50;
+        final double power = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, power);
     }
 
     /**
@@ -634,7 +668,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      */
     private void grabSampleAsync() throws InterruptedException {
         // Presssing the grab button
-        linearSlideLift.setPower(0);
+        linearSlideLeft.setPower(0);
+        linearSlideRight.setPower(0);
         isStateInitialized = false;
         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
         intakeWheelR.setPower(INTAKE_POWER_HOLD);
@@ -650,7 +685,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void depositAsync() throws InterruptedException {
-        intakePivot.setPosition(SERVO_VALUES.pivotAlternateDepositPos);
+        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
         sleep(400);
         intakeWheelR.setPower(INTAKE_POWER_EMPTY);
         intakeWheelL.setPower(INTAKE_POWER_EMPTY);
@@ -670,12 +705,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     }
 
     private void extendToBucketsSync() {
-        AutoInit.driveMotorTo(
-            linearSlideLift,
-            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
-            10, 
-            EXTENSION_POWER
-        );
+        final int target = (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate;
+        final int tolerance = 10;
+        final double speed = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, speed);
     }
 
     /**
@@ -787,12 +820,12 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     }
 
     private void pivotDown() throws InterruptedException {
-        AutoInit.driveMotorTo(
-            linearSlidePivot, 
-            PIVOT_HANG_SPECIMEN, 
-            10, 
-            -1.0
-        );  
+        final int target = (int) PIVOT_CONSTANTS.specimenPlacePos;
+        final int tolerance = 20;
+
+        while(Math.abs(getLinearPivotAvgPosition() - target) <= tolerance) {
+            linearPivotTargetPosition = target;
+        }
     }
 
     /**
@@ -809,8 +842,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         lift.switchToChamber();
     
         // Wait for the pivot to be reasonably rotated before extending 
-        final double bound = (PIVOT_CHAMBER + PIVOT_MIN_POSITION) / 2;
-        while(linearSlidePivot.getCurrentPosition() < bound) {
+        final double bound = (PIVOT_CONSTANTS.specimenPositionPos + PIVOT_CONSTANTS.minPos) / 2;
+        while(getLinearPivotAvgPosition() < bound) {
             sleep(30); // Give time to other threads to do their thang
         }
 
@@ -844,7 +877,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         hookChamber();
         
         // Waiting for the hook to fully... well, hook.
-        while(linearSlideLift.getCurrentPosition() >= FULLY_RETRACTED + 30) {
+        while(getLinearSlideAvgPosition() >= FULLY_RETRACTED + 30) {
             sleep(30); // Wait whiling freeing up CPU for other threads.
         }
     }
@@ -899,8 +932,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // Starting the actual stuffs
         lift.start();
-        SLIDE_CONSTANTS.depositEndRetract = TWELVE_INCHES_EXTENSION;
-        SLIDE_CONSTANTS.intakeEndRetract = TWELVE_INCHES_EXTENSION;
+        SLIDE_CONSTANTS.depositEndRetract = EXTEND_TO_SAMPLE_EXTENSION;
+        SLIDE_CONSTANTS.intakeEndRetract = EXTEND_TO_SAMPLE_EXTENSION;
 
         // Driving to the chamber and scoring
         timer = timeSection("chamber_inital");
@@ -912,17 +945,17 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 //        // globalDrive.maxWheelVel = 40;
 //        logTime(timer);
 //        }
-        moveAndPlaceSpecimen();
-        switchArmAsync(); // Lowring the arm
-        globalDrive.PARAMS.maxWheelVel = 40;
-        logTime(timer);
+        // moveAndPlaceSpecimen();
+        // switchArmAsync(); // Lowring the arm
+        // globalDrive.PARAMS.maxWheelVel = 30;
+        // logTime(timer);
         // if(arg) {
         //     return;
         // }
 
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
-        for(int i = 0; i >= 0 && opModeIsActive(); i--) {
+        for(int i = 2; i >= 0 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
             final double extraRotation = i == 0 ? Math.toRadians(30) : 0; // Rotate more cuz' last one's hard to get to. 
@@ -1007,7 +1040,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         }
 
         // Retracting fully after the last basket
-        driveMotorTo(linearSlideLift, 0, 10, -SLIDE_SPEED);
+        driveLiftTo(0, 10, RETRACTION_POWER);
 
         // lift.close();
 
