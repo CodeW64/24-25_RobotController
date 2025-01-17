@@ -33,7 +33,7 @@ public class BasketPathTestSingleThread extends LinearOpMode {
 
     MecanumDrive drive;
     TelemetryDrive telemetryDrive;
-    RobotLift lift;
+//     RobotLift lift;
 
     Pose2d startPose = new Pose2d(-12, -66, Math.toRadians(90)); // estimation
 
@@ -47,7 +47,6 @@ public class BasketPathTestSingleThread extends LinearOpMode {
 
         drive = new MecanumDrive(hardwareMap, startPose);
         telemetryDrive = new TelemetryDrive();
-        lift = new RobotLift(hardwareMap, telemetry);
 
 
         // set up velocity and acceleration constraints to be used later
@@ -115,9 +114,6 @@ public class BasketPathTestSingleThread extends LinearOpMode {
         telemetry.update();
 
         waitForStart();
-
-        Actions.runBlocking(lift.duck.spinDuck());
-
 
         // run the autonomous
         Actions.runBlocking(new SequentialAction(

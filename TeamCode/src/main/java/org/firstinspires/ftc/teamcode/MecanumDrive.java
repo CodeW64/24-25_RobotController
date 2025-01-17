@@ -67,24 +67,95 @@ public final class MecanumDrive {
         // drive model parameters
 
 
-        public double inPerTick = 0.00303893637227;
+        public double inPerTick = 0.00304;
 
-        public double lateralInPerTick = 0.002525487032662218; // run LatRampLog if having issues (normally = inPerTick)
+        public double lateralInPerTick = 0.00180; // run LatRampLog if having issues (normally = inPerTick)
+        // 0.002525487032662218
 
         // 30 = 5575.1
-        public double trackWidthTicks = 4320.3; // 4320.3 OLD 3455.7795234191576
+        public double trackWidthTicks = 4146.1; // 4320.3 OLD 3455.7795234191576
 
         // feedforward parameters (in tick units)
 
         //kV: 0.0007482212097879431, kS: 1.0062087209129773
         // 30 = 0.53
-        public double kS = 1.56; // 1.56 OLD 1.0062087209129773
+        public double kS = 2.45; // 1.56 OLD 1.0062087209129773
 
         // 30 = 0.000541
-        public double kV = 0.00054; // 0.00054 OLD 0.0007482212097879431
+        public double kV = 0.000365; // 0.00054 OLD 0.0007482212097879431
 
         // 30 = 0.00004
-        public double kA = 0.00005; // 0.00005 OLD 0.0000929688
+        public double kA = 0.000055; // 0.00005 OLD 0.0000929688
+
+        // path profile parameters (in inches)
+
+        // 30 = 30
+        public double maxWheelVel = 50; // 35
+
+        // 30 = -30
+        public double minProfileAccel = -maxWheelVel; // -30
+
+        // 30 = 30
+        public double maxProfileAccel = maxWheelVel; // 30
+
+        // turn profile parameters (in radians)
+
+        // 30 = 2.531 ~ Math.toRadians(145)
+        public double maxAngVel = 2.880; // shared with path
+
+        // 30 = 2.531 ~ Math.toRadians(145)
+        public double maxAngAccel = 2.880; // ~ 165 degrees // 2.880
+
+        // path controller gains
+
+        // 30 = 2.0
+        public double axialGain = 5.0; // 5.0
+
+        // 30 = 3.0
+        public double lateralGain = 5.0; // 5.0
+
+        // 30 = 3.0
+        public double headingGain = 5.0; // 5.0, shared with turn
+
+        public double axialVelGain = 1.0; // 1.0
+        public double lateralVelGain = 1.0; // 1.0
+        public double headingVelGain = 0.0; // 0.0, shared with turn
+
+        public double positionTolerance = 1.0; // Inches
+        public double headingTolerance = Math.toRadians(5); // Radians
+        public double velTolerance = 5.0; // Distance in/sec
+    }
+
+    public static class OldParams {
+        // IMU orientation
+
+        public RevHubOrientationOnRobot.LogoFacingDirection logoFacingDirection =
+                RevHubOrientationOnRobot.LogoFacingDirection.LEFT;
+        public RevHubOrientationOnRobot.UsbFacingDirection usbFacingDirection =
+                RevHubOrientationOnRobot.UsbFacingDirection.UP;
+
+        // drive model parameters
+
+
+        public double inPerTick = 0.00304;
+
+        public double lateralInPerTick = 0.00180; // run LatRampLog if having issues (normally = inPerTick)
+        // 0.002525487032662218
+
+        // 30 = 5575.1
+        public double trackWidthTicks = 4146.1; // 4320.3 OLD 3455.7795234191576
+
+        // feedforward parameters (in tick units)
+
+        //kV: 0.0007482212097879431, kS: 1.0062087209129773
+        // 30 = 0.53
+        public double kS = 2.45; // 1.56 OLD 1.0062087209129773
+
+        // 30 = 0.000541
+        public double kV = 0.000365; // 0.00054 OLD 0.0007482212097879431
+
+        // 30 = 0.00004
+        public double kA = 0.000055; // 0.00005 OLD 0.0000929688
 
         // path profile parameters (in inches)
 
@@ -108,17 +179,17 @@ public final class MecanumDrive {
         // path controller gains
 
         // 30 = 2.0
-        public double axialGain = 5.0;
+        public double axialGain = 5.0; // 5.0
 
         // 30 = 3.0
-        public double lateralGain = 5.0;
+        public double lateralGain = 5.0; // 5.0
 
         // 30 = 3.0
-        public double headingGain = 5.0; // shared with turn
+        public double headingGain = 5.0; // 5.0, shared with turn
 
-        public double axialVelGain = 1.0;
-        public double lateralVelGain = 1.0;
-        public double headingVelGain = 0.0; // shared with turn
+        public double axialVelGain = 1.0; // 1.0
+        public double lateralVelGain = 1.0; // 1.0
+        public double headingVelGain = 0.0; // 0.0, shared with turn
     }
 
     public static Params PARAMS = new Params();
@@ -337,9 +408,9 @@ public final class MecanumDrive {
             // TODO: find the right tolerances
             // UNCOMMENT HERE
             if ((t >= timeTrajectory.duration
-                    && error.position.norm() < 1
-                    && Math.abs(error.heading.toDouble()) < Math.toRadians(5)
-                    && robotVelRobot.linearVel.norm() < 5)
+                    && error.position.norm() < PARAMS.positionTolerance
+                    && Math.abs(Math.toDegrees(error.heading.toDouble())) < PARAMS.headingTolerance
+                    && robotVelRobot.linearVel.norm() < PARAMS.velTolerance)
                     || t >= timeTrajectory.duration + 1) {
                 leftFront.setPower(0);
                 leftBack.setPower(0);

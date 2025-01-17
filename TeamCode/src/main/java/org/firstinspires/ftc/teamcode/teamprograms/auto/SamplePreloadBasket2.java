@@ -1,25 +1,47 @@
 package org.firstinspires.ftc.teamcode.teamprograms.auto;
 
-import com.acmerobotics.roadrunner.Pose2d;
-import com.acmerobotics.roadrunner.TranslationalVelConstraint;
-import com.acmerobotics.roadrunner.Vector2d;
-import com.acmerobotics.roadrunner.ftc.Actions;
-import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
-import com.qualcomm.robotcore.hardware.ColorRangeSensor;
-import com.qualcomm.robotcore.hardware.DcMotorEx;
-import com.qualcomm.robotcore.hardware.Gamepad;
-import com.qualcomm.robotcore.util.ElapsedTime;
-
-import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
-import org.firstinspires.ftc.teamcode.MecanumDrive;
 import org.firstinspires.ftc.teamcode.teamprograms.ButtonPressHandler;
-import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.teamcode.teamprograms.teleop.IntoTheDeepTeleop;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.concurrent.locks.Condition;
+
+import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.DcMotor;
+import org.firstinspires.ftc.robotcore.external.Telemetry;
+import org.firstinspires.ftc.teamcode.MecanumDrive;
+
+import com.qualcomm.robotcore.eventloop.opmode.OpMode;
+import com.qualcomm.robotcore.hardware.Gamepad;
+import com.qualcomm.robotcore.hardware.DcMotorEx;
+import com.qualcomm.robotcore.hardware.ColorRangeSensor;
+import com.qualcomm.robotcore.eventloop.opmode.Autonomous;
+import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
+import com.qualcomm.robotcore.util.ElapsedTime;
+import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
+
+import org.firstinspires.ftc.vision.apriltag.AprilTagDetection;
+import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
+
+import org.firstinspires.ftc.teamcode.MecanumDrive;
+import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.Pose2d;
+import com.acmerobotics.roadrunner.Vector2d;
+import com.acmerobotics.roadrunner.TranslationalVelConstraint;
+import com.acmerobotics.roadrunner.ftc.Actions;
+import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
+// import com.acmerobotics.roadrunner.ftc.Actions;
+
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
+import java.util.function.DoubleConsumer;
+import java.util.function.Function;
+
+import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 
 
 /**
@@ -28,19 +50,20 @@ import java.util.function.Consumer;
  * 
  * @author Connor Larson
  */
-@Autonomous(name="Basket Placer (Preloaded Sample 2)")
+@Autonomous(name="Basket Placer 2 (Preloaded Sample)")
 public class SamplePreloadBasket2 extends AutoCommonPaths {
     private boolean isBlue = true;
     private boolean shouldParkObservation = true; // False: Go to ascent zone there
     private int neutralTagId = AprilLocater.NEUTRAL_BLUE_ID;
     private int coloredTagId = AprilLocater.COLORED_BLUE_ID;
     private boolean repositionEnabled = false;
+    // DEV: This line is true to do testing; please make it false by thurs
+    private boolean isTeleopMode = false; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
 
     private ButtonPressHandler toggleBlueSide;
     private ButtonPressHandler toggleObservationPark;
     private ButtonPressHandler repositionToggle;
-
-    private DcMotorEx linearSlideLift;
+    private ButtonPressHandler teleopModeToggle; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
 
     /**
      * Describes the robot's relative coordinates. That is, the x is width on 
@@ -62,20 +85,32 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * Global coordinates of where and how the robot starts for this opmode.
      */
     private final Pose2d START_LOCATION = new Pose2d(
-            -72 + ROBOT_CENTER.position.x, // -72 is the left grid x-coord
-            48 - ROBOT_CENTER.position.y, //  48 is the top y-coord
-            0  + ROBOT_CENTER.heading.toDouble() // 0 is the deafult rotation
+        -72 + ROBOT_CENTER.position.y, // -72 is the left grid x-coord 
+         48 - ROBOT_CENTER.position.x, //  0 is the top y-coord
+         0  + ROBOT_CENTER.heading.toDouble() // 0 is the deafult rotation
     );
 
     private double sampleSensingDistance;
 
     private int CHAMBER_EXTENSION = 2500;
-    private int TWELVE_INCHES_EXTENSION = 1700;
-    private int FULLY_RETRACTED = 600;
+    private int extendToSampleExtension = 1075;
+    private int FULLY_RETRACTED = 500;
     
     private double EXTENSION_POWER = 1.0; // Previously 0.15
     private double RETRACTION_POWER = -1.0; // Previous -0.4
     private boolean isTime = false; // DEV: This is exists for debuggin telemetry
+
+    public static interface ThreadIdentifiers {
+            public static enum Type { UNKNOWN, EXTENSION, SWITCH }
+
+            public final static Type UNKNOWN = Type.UNKNOWN;
+            public final static Type EXTENSION = Type.EXTENSION;
+            public final static Type SWITCH = Type.SWITCH;
+
+            public Type getType();
+
+            public String getName();
+    }
 
     /**
      * Contains methods so that the arm can be managed from outside the teleop, 
@@ -87,7 +122,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         private Boolean isSwitching = false;
         private boolean hasStartedSwitch = true;
         private long pressDuration = 30; // In milliseonds
-        private ArrayList<Closeable> runningThreads = new ArrayList<Closeable>();
+        private ArrayList<ConditionalThread> runningThreads = new ArrayList<ConditionalThread>();
 
         public LiftHandlerThread() {
             super();
@@ -106,72 +141,58 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * @param tolerance The maximum allowed differnece between the target 
          *     and the motor's end position. The difference is absolute, so the 
          *     size of the allowed range is equal to 2 * tolerance. 
-         * @param power How powerful the motor should be run. Positive values 
-         *     extend, negative retract.
+         * @param power How powerful the motor should be run. 
          */
         public void extendSlides(int target, int tolerance, double power) {
+            if(getIsExtending()) {
+                // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
+                for(final ConditionalThread thread : runningThreads) {
+                    if(thread.identifiers.getType() == ThreadIdentifiers.EXTENSION) {
+                        thread.close();
+                        runningThreads.remove(thread);
+                    }
+                }
+            }
+            
             setIsExtending(true);
-            final ConditionalThread conditionalThread = new ConditionalThread();
-            conditionalThread.finishInitialization(
-                () -> Math.abs(linearSlideLift.getCurrentPosition() - target) <= tolerance,
+            // TODO: Add id's to the threads? 
+            final ConditionalThread extensionThread = new ConditionalThread(new ThreadIdentifiers() {
+                public Type getType() {
+                   return ThreadIdentifiers.EXTENSION; 
+                }
+
+                public String getName() {
+                    return "Extension.extensionThread";
+                }
+            });
+            
+            extensionThread.finishInitialization(
+                () -> Math.abs(getLinearSlideAvgPosition() - target) <= tolerance,
                 (Boolean unusedParam) -> {
                     // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
-                    driveSlidesTo(target, tolerance, power);
+                    setFightingGravity(false);
+                    linearSlideLeft.setTargetPosition(target);
+                    linearSlideLeft.setTargetPositionTolerance(tolerance);
+                    linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                    linearSlideLeft.setPower(power);
+
+                    linearSlideRight.setTargetPosition(target);
+                    linearSlideRight.setTargetPositionTolerance(tolerance);
+                    linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+                    linearSlideRight.setPower(power);
                 },
                 (Boolean unusedParam) -> {
-                    gamepad2.right_stick_y = 0;
+                    setFightingGravity(true);
+                    linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                    linearSlideLeft.setPower(0);
+                    linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+                    linearSlideRight.setPower(0);
                     setIsExtending(false);
-                    runningThreads.remove(conditionalThread);
+                    runningThreads.remove(extensionThread);
                 }
             );
-            runningThreads.add(conditionalThread);
-            conditionalThread.start();
-        }
-
-        
-        /**
-         * Rotates the given motor at a given power until the target is reached, 
-         * with some tolerance. A motor encoder must be connected to the motor for 
-         * this method to work.
-         * 
-         * @param motor the motor to drive.
-         * @param tickTarget Where to rotate to.
-         * @param tolerance The maximum allowed differnece between the target 
-         *     and the motor's end position. The difference is absolute, so the 
-         *     size of the allowed range is equal to 2 * tolerance. 
-         * @param power How powerful the motor should be run. Positive values 
-         *     extend, negative retract.
-         */
-        private void driveSlidesTo(int tickTarget, int tolerance, double power) {
-            double reverseFactor  = 1; // Reverse at a lower speed if the target is missed.
-
-            while(Math.abs(linearSlideLift.getCurrentPosition() - tickTarget) > tolerance) {
-                if((tickTarget - linearSlideLift.getCurrentPosition()) / (reverseFactor * power) < 0) {
-                    reverseFactor *= -0.5; // Put it in reverse, Ter! ...and put half the previous speed 
-                }
-                gamepad2.right_stick_y = (float) (-reverseFactor * power);
-                
-                // DEV START: The data log for debugging the sample pause
-                if(isTime) {
-                    telemetry.clear();
-                    telemetry.addData("pivot_pos", linearSlidePivot.getCurrentPosition());
-                    telemetry.addData("reverse_factor", reverseFactor);
-                    telemetry.addLine();
-                    telemetry.addData("target", tickTarget);
-                    telemetry.addData("current", linearSlideLift.getCurrentPosition());
-                    telemetry.addData("| target - lift-pos |", Math.abs(linearSlideLift.getCurrentPosition() - tickTarget));
-                    telemetry.addData("tolerance", tolerance);
-                    telemetry.update();
-                }
-                // DEV END
-            }
-
-            // DEV START: Final data log for the debugging sample pause
-            if(isTime) {
-                telemetry.addLine("Finished the thing");
-            }
-            // DEV END
-            gamepad2.right_stick_y = 0; // Stop the motor from continuing
+            runningThreads.add(extensionThread);
+            extensionThread.start();
         }
 
         /**
@@ -182,12 +203,11 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * @return Boolean describing wether it is accurate to call the state a 
          *     deposit state.
          */
-        public boolean isDepositPosition(LinearSlideStates state) {
-            return state == LinearSlideStates.DEPOSIT_ACTIVE
-                || state == LinearSlideStates.DEPOSIT_RETRACT_SET
-                || state == LinearSlideStates.DEPOSIT_RETRACT
-                || state == LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE
-                || state == LinearSlideStates.DEPOSIT_ALTERNATE_RETRACT_SET;
+        public boolean isDepositPosition(AutoArmRunner2.LinearSlideStates state) {
+            return state == AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE
+                || state == AutoArmRunner2.LinearSlideStates.PIVOT_TO_DEPOSIT
+                || state == AutoArmRunner2.LinearSlideStates.DEPOSIT_RETRACT
+                || state == AutoArmRunner2.LinearSlideStates.DEPOSIT_RETRACT_SET;
         }
         
         /**
@@ -197,25 +217,35 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * @return Whether the slides have fully pivoted
          */
         public boolean hasFinishedPivot() {
-            return linearSlideState.equals(LinearSlideStates.DEPOSIT_ALTERNATE_ACTIVE)
-                || linearSlideState.equals(LinearSlideStates.DEPOSIT_ACTIVE)
-                || linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
-                || linearSlideState.equals(LinearSlideStates.INTAKE_FULL);
+            return linearSlideState.equals(AutoArmRunner2.LinearSlideStates.DEPOSIT_ACTIVE)
+                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_ACTIVE)
+                || linearSlideState.equals(AutoArmRunner2.LinearSlideStates.INTAKE_FULL);
         }
 
         /**
          * Toggles the arm between an intake position and a deposit position.
          */
         public void switchArmMode() {
+            if(getIsSwitching()) {
+                // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
+                for(final ConditionalThread thread : runningThreads) {
+                    if(thread.identifiers.getType() == ThreadIdentifiers.SWITCH) {
+                        thread.close();
+                        runningThreads.remove(thread);
+                    }
+                }
+            }
+
             // SEt and set initial conditions
-            final LinearSlideStates intialState = linearSlideState;
+            final AutoArmRunner2.LinearSlideStates intialState = linearSlideState; 
             final boolean initialStateIsDeposit = isDepositPosition(linearSlideState);
             setIsSwitching(true);
             hasStartedSwitch = true;
             
             // Initialize the process for switiching
-            final ConditionalThread buttonPresser = new ConditionalThread();
-            final ConditionalThread armSwitcher = new ConditionalThread();
+            // TODO: Add id's to the threads? 
+            final ConditionalThread buttonPresser = new ConditionalThread("switchArmMode.buttonPresser", ThreadIdentifiers.SWITCH);
+            final ConditionalThread armSwitcher = new ConditionalThread("switchArmMode.armSwitcher", ThreadIdentifiers.SWITCH);
 
             buttonPresser.finishInitialization(
                 () -> isDepositPosition(linearSlideState) != initialStateIsDeposit, 
@@ -251,11 +281,15 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             hasStartedSwitch = false;
             
             // Initialize the process for switiching
-            final ConditionalThread buttonPresser = new ConditionalThread();
-            final ConditionalThread armSwitcher = new ConditionalThread();
+            // TODO: Add id's to the threads? 
+
+            final ConditionalThread buttonPresser = new ConditionalThread("switchToChamber.buttonPresser", ThreadIdentifiers.SWITCH);
+            final ConditionalThread armSwitcher = new ConditionalThread("switchToChamber.armSwithcer", ThreadIdentifiers.SWITCH);
 
             buttonPresser.finishInitialization(
-                () -> linearSlideState.equals(LinearSlideStates.PIVOT_TO_CHAMBER),
+                () -> 
+                    linearSlideState.equals(AutoArmRunner2.LinearSlideStates.SPECIMEN_POSITION) 
+                    && Math.abs(getLinearPivotAvgPosition() - PIVOT_CONSTANTS.specimenPositionPos) < 20, 
                 (Boolean unusedParam) -> {
                     gamepad2.left_trigger = 0;
                     gamepad2.dpad_left = false;
@@ -279,6 +313,17 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             gamepad2.left_trigger = 1.0f;
             gamepad2.dpad_left = true;
             buttonPresser.start();
+        }
+
+        public void print() {
+            telemetry.addLine("---------- Lift Handler Threads --------");
+            telemetry.addData("All running threads", runningThreads.size());
+            telemetry.addLine("All running threads:");
+
+            // logging all the data
+            for(final ConditionalThread thread : runningThreads) {
+                telemetry.addLine("  " + thread.identifiers.getName());
+            }
         }
 
         @Override
@@ -369,9 +414,28 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         private Consumer<Boolean> onContinue = (Boolean unusedParam) -> {/* NOOP */};
         private Consumer<Boolean> onFinish;
         private boolean isOpen = true;
+        public ThreadIdentifiers identifiers;
 
         public ConditionalThread() {
             super();
+        }
+        
+        public ConditionalThread(String name, ThreadIdentifiers.Type type) {
+            super();
+            this.identifiers = new ThreadIdentifiers() {
+                public ThreadIdentifiers.Type getType() {
+                    return type;
+                }
+
+                public String getName() {
+                    return name;
+                }
+            };
+        }
+
+        public ConditionalThread(ThreadIdentifiers identifiers) {
+            super();
+            this.identifiers = identifiers;
         }
 
         public ConditionalThread(BooleanSupplier condition, Consumer<Boolean> onFinish) {
@@ -438,8 +502,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
                 onFinish.accept(!condition.getAsBoolean());
             } catch(InterruptedException err) {
-                telemetry.addData("!!CAUGHT ERR", err.getMessage());
-                telemetry.update();
+                telemetry.addData("Interupted Running Conditional Thread: ", err.getMessage());
             }
         }
     
@@ -479,20 +542,16 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
         // telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
         // telemetry.update();
-        isTelemetrySuppresed = true;
+        isTelemetrySuppresed = false;
         
         // Initializing other hardware(-ish) bits
         globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
-        linearSlideLift = hardwareMap.get(DcMotorEx.class, "linearSlideLift");
-        linearSlidePivot = hardwareMap.get(DcMotorEx.class, "linearSlidePivot");
-        linearSlideLift.setDirection(DcMotorEx.Direction.REVERSE);
-        linearSlidePivot.setDirection(DcMotorEx.Direction.REVERSE);
         sampleSensingDistance = hardwareMap
             .get(ColorRangeSensor.class, "sampleSensor")
             .getDistance(DistanceUnit.CM);
 
         // lift.start();
-        // initHardware();
+        initHardware();
         
 
         // Creating init_loop options
@@ -503,12 +562,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 coloredTagId = isBlue ? AprilLocater.COLORED_BLUE_ID : AprilLocater.COLORED_RED_ID;
             });
 
-            toggleObservationPark = new ButtonPressHandler(gamepad1, "b", (Gamepad g) -> {
-                shouldParkObservation = !shouldParkObservation;
-            });
-            
             repositionToggle = new ButtonPressHandler(gamepad1, "start", (Gamepad g) -> {
                 repositionEnabled = !repositionEnabled;
+            });
+        
+            teleopModeToggle = new ButtonPressHandler(gamepad1, "back", (Gamepad g) -> {
+                isTeleopMode = !isTeleopMode;
             });
         } catch(NoSuchFieldException | NullPointerException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err.getMessage());
@@ -534,26 +593,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         telemetry.addLine("");
         telemetry.addLine("==== OPTION CONTROLS ====");
         telemetry.addData("Toggle Blue Side", "Press " + toggleBlueSide.getButtonName());
-        telemetry.addData("Toggle Observation Park", "Press " + toggleObservationPark.getButtonName());
         telemetry.addData("Respoition Toggle", "Press " + repositionToggle.getButtonName());
-        telemetry.addData("Lower Arm Start", "Hold dpad_down");
-        telemetry.addData("Lower Arm Start", "Hold dpad_up");
 
         // Detecting buttonPresses
         try {
             toggleBlueSide.activateIfPressed();
-            toggleObservationPark.activateIfPressed();
             repositionToggle.activateIfPressed();
-
-            if(!gamepad1.dpad_down && gamepad1.dpad_up && linearSlidePivot != null) {
-                // Raise the pivot
-                linearSlidePivot.setPower(0.8);
-            } else if(gamepad1.dpad_down && !gamepad1.dpad_up && linearSlidePivot != null) {
-                // Lower the pivot
-                linearSlidePivot.setPower(-0.8);
-            } else if(linearSlidePivot != null) {
-                linearSlidePivot.setPower(0);
-            }
         } catch(IllegalAccessException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err.getMessage());
         }
@@ -561,6 +606,28 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         if(repositionEnabled) {
             driveWheels();
         }
+    }
+
+    private void driveLiftTo(int target, int tolerance, double power) {
+        while(Math.abs(getLinearSlideAvgPosition() - target) > tolerance) {
+            // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+            setFightingGravity(false);
+            linearSlideLeft.setTargetPosition(target);
+            linearSlideLeft.setTargetPositionTolerance(tolerance);
+            linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideLeft.setPower(power);
+
+            linearSlideRight.setTargetPosition(target);
+            linearSlideRight.setTargetPositionTolerance(tolerance);
+            linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideRight.setPower(power);
+        }
+
+        setFightingGravity(true);
+        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        linearSlideLeft.setPower(0);
+        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+        linearSlideRight.setPower(0);
     }
 
     /**
@@ -572,16 +639,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void extendAsync() throws InterruptedException {
-        lift.extendSlides(TWELVE_INCHES_EXTENSION, 10, EXTENSION_POWER);
+        lift.extendSlides(extendToSampleExtension, 10, EXTENSION_POWER);
     }
 
-    private void extendSync() {
-        AutoInit.driveMotorTo(
-            linearSlideLift, 
-            1550,
-            10, 
-            EXTENSION_POWER
-        );
+    private void extendSync(int offset) {
+        final int target = extendToSampleExtension + offset;
+        final int tolerance = 10;
+        final double power = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, power);
     }
 
     /**
@@ -597,12 +662,10 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     }
 
     private void retractSync() {
-        AutoInit.driveMotorTo(
-            linearSlideLift,
-            FULLY_RETRACTED, 
-            30, 
-            RETRACTION_POWER
-        );
+        final int target = FULLY_RETRACTED;
+        final int tolerance = 50;
+        final double power = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, power);
     }
 
     /**
@@ -616,11 +679,16 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      */
     private void grabSampleAsync() throws InterruptedException {
         // Presssing the grab button
-        linearSlideLift.setPower(0);
-        isStateInitialized = false;
-        linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
-        intakeWheelR.setPower(INTAKE_POWER_HOLD);
-        intakeWheelL.setPower(INTAKE_POWER_HOLD);
+        linearSlideLeft.setPower(0);
+        linearSlideRight.setPower(0);
+        intakeWheelR.setPower(INTAKE_POWER_MAX);
+        intakeWheelL.setPower(INTAKE_POWER_MAX);
+    }
+
+    private void hoverSampleAsync() throws InterruptedException {
+        intakePivot.setPosition(SERVO_VALUES.pivotHoverPos);
+        intakeWheelR.setPower(INTAKE_POWER_MAX);
+        intakeWheelL.setPower(INTAKE_POWER_MAX);
     }
 
     /**
@@ -632,8 +700,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void depositAsync() throws InterruptedException {
-        intakePivot.setPosition(SERVO_VALUES.pivotAlternateDepositPos);
-        sleep(400);
+        // intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
         intakeWheelR.setPower(INTAKE_POWER_EMPTY);
         intakeWheelL.setPower(INTAKE_POWER_EMPTY);
     }
@@ -645,19 +712,17 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      */
     private void extendToBucketsAsync() {
         lift.extendSlides(
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
+            (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
             10, 
             EXTENSION_POWER
         );
     }
 
     private void extendToBucketsSync() {
-        AutoInit.driveMotorTo(
-            linearSlideLift,
-            (int) AutoArmRunner.SLIDE_CONSTANTS.topBucketHeightAlternate, 
-            10, 
-            EXTENSION_POWER
-        );
+        final int target = (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate;
+        final int tolerance = 10;
+        final double speed = EXTENSION_POWER;
+        driveLiftTo(target, tolerance, speed);
     }
 
     /**
@@ -665,19 +730,23 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * attempts the grab only once. The arm remains extended afterwards.
      * 
      * <p> Estimated blocking runtime: 2750 ms
-     *  
+     * 
+     * @return Whether or not the sample was obtained. 
      * @throws InterruptedException
      */
-    private void grabSampleSync(boolean retry) throws InterruptedException {
+    private boolean grabSampleSync(boolean retry, int offset) throws InterruptedException {
         // TODO: Make this retry if nothing is grabbed
         telemetry.addLine("Extending to sample...");
         telemetry.update();
         lift.waitForFinish(); // Wait for the arm to finish retraction
-        extendSync();
+        extendSync(offset);
         // lift.waitForExtension(); // Waiting for full extension
 
+        isStateInitialized = false;
+        linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
+
         retryLoop:
-        while(!isPossessingSample(currentSampleDistance)) {
+        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 4.0) {
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -690,20 +759,29 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
+                && lightTimer.seconds() <= 2.0 
+                && !isPossessingSample(currentSampleDistance)
             ) {
                 sleep(30); // Waiting whilst freeing CPU for other threads
             }
 
             // Exiting the retry loop if we don't want to retry
-            if(!retry) {
-                break retryLoop; 
+            // if(!retry) {
+            //     break retryLoop; 
+            // }
+
+            if(isPossessingSample(currentSampleDistance)) {
+                break retryLoop;
             }
 
             // Moving so that we have more chance of getting it.
+            hoverSampleAsync();
             setDestinationOffset(new Pose2d(1, 2, 0)); // Move from current position forward and a sample up
             lineTo(globalDrive, getCurrentPosition());
             resetDestinationOffset();
         }
+
+        return isPossessingSample(currentSampleDistance);
     }
 
     /**
@@ -715,11 +793,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     private void berriddenOfSample() throws InterruptedException {
         // The arm is raised, so put it into the basket!
         depositAsync();
-        sleep(500); // To stop from accidentally moving too fast
-
-        // Protecting the intake
-        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-        sleep(300);
+        sleep(200); // To stop from accidentally moving with the sample still in the robot's maw
 
         // Lowering and switching
         switchArmAsync();
@@ -755,80 +829,6 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             globalDrive, 
             curPos.plus(offset) // Move forward dist inches 
         );
-    }
-
-    /**
-     * Extends the linear slides so that the specimen can hook
-     */
-    private void extendToChambersAsync() {
-        lift.extendSlides(CHAMBER_EXTENSION, 10, 1.0);
-    }
-
-    private void hookChamber() throws InterruptedException {
-        retractAsync();
-    }
-
-    private void pivotDown() throws InterruptedException {
-        AutoInit.driveMotorTo(
-            linearSlidePivot, 
-            PIVOT_HANG_SPECIMEN, 
-            10, 
-            -1.0
-        );  
-    }
-
-    /**
-     * Moves the robot to the chambers and places the specimen. The linear 
-     * slides are in the slightly retracted position, and the pivot is in deposit.
-     */
-    private void moveAndPlaceSpecimen() throws InterruptedException {
-        // switchArmAsync();
-        // extendToChambersAsync();
-        // moveToCloseChamberInitial(distFromChamber);
-        // lift.waitForSwitch();
-
-        lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)) );
-        lift.switchToChamber();
-    
-        // Wait for the pivot to be reasonably rotated before extending 
-        final double bound = (PIVOT_CHAMBER + PIVOT_MIN_POSITION) / 2;
-        while(linearSlidePivot.getCurrentPosition() < bound) {
-            sleep(30); // Give time to other threads to do their thang
-        }
-
-        // Extend, move, and wait for the switch before hooking
-        final double SAFETY_DIST = 24; // Used to prevent contact with the 
-        final double ALLIANCE_SHARING_DIST = 2; // Inches from the tile teeth, for space
-        extendToChambersAsync();
-        // lineTo(globalDrive, new Pose2d(
-        //     BLUE_CHAMBER.position.x - SAFETY_DIST, 
-        //     BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y, 
-        //     0
-        // ));
-        final Pose2d currentPos = getCurrentPosition();
-        final Pose2d dest = new Pose2d(
-            BLUE_CHAMBER.position.x - SAFETY_DIST, 
-            BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y + ALLIANCE_SHARING_DIST, 
-            0
-        );
-        Actions.runBlocking(globalDrive.actionBuilder(currentPos)
-            .setTangent(Math.atan2(currentPos.position.y - dest.position.y, currentPos.position.x - dest.position.x))
-            .lineToY(dest.position.y, new TranslationalVelConstraint(20.0))
-            .build()
-        );
-        resetDestinationOffset();
-        lift.waitForFinish();
-
-        
-        // Moving forward and hooking onto the chamber'
-        // lineTo(globalDrive, BLUE_BUCKETS_CHAMBER);
-        pivotDown(); // Lowering the motor to prevent collisions
-        hookChamber();
-        
-        // Waiting for the hook to fully... well, hook.
-        while(linearSlideLift.getCurrentPosition() >= FULLY_RETRACTED + 30) {
-            sleep(30); // Wait whiling freeing up CPU for other threads.
-        }
     }
 
     /**
@@ -881,25 +881,34 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         // Starting the actual stuffs
         lift.start();
+        SLIDE_CONSTANTS.intakeEndRetract = 2147000;
+        SLIDE_CONSTANTS.depositEndRetract = extendToSampleExtension;
+
+        linearSlideState = LinearSlideStates.INTAKE_FULL;
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
+        intakeWheelR.setPower(INTAKE_POWER_HOLD);
+        intakeWheelL.setPower(INTAKE_POWER_HOLD);
 
         // Driving to the chamber and scoring
         timer = timeSection("sample_inital");
         globalDrive.updatePoseEstimate();
 
         double DIST_INCREMENT = 0; // NOTE: change this when roadRunner is tuned
-        double DIST_BACK = 7.5;
-        double DIST_STRAFE = 2.5;
+        double DIST_BACK = 7.2;
+        double DIST_STRAFE = 0;
         double SQRT2 = Math.sqrt(2);
         Pose2d BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
         setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
+        switchArmAsync(); // Get the arm up
+        lift.waitForSwitchStart();
+
+        MecanumDrive.PARAMS.positionTolerance = 0.7;
         moveRobotToNetZone(isBlue);
+        MecanumDrive.PARAMS.positionTolerance = 1.0;
+        lift.waitForSwitch();
         resetDestinationOffset();
 
         // Putting the preloaded sample into the basket
-        switchArmAsync(); // Get the arm up
-
-        lift.waitForSwitch();
-
         extendToBucketsAsync(); // Extend there
         lift.waitForFinish();
         // netMoveSync(8); // Move forward 8 inches
@@ -907,12 +916,13 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
-        for(int i = 2; i >= 1 && opModeIsActive(); i--) {
+        grabDepositLoop:
+        for(int i = 2; i >= 0 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = new Pose2d(-6.25, 3, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(-24, 0, 0);
+            final double extraRotation = i == 0 ? Math.toRadians(30) : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = i == 0 ? new Pose2d(-20, 0, 0) : new Pose2d(-20.0, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -924,7 +934,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 new Vector2d(/*M12*/-Math.sin(extraRotation), /*M22*/Math.cos(extraRotation))
             };
             final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
-            final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+            Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+
+            if(i == 0) {
+                finalOffset = addPoses(finalOffset, new Pose2d(0, 10, 0));
+                extendToSampleExtension = 1300;
+            } else {
+                finalOffset = addPoses(finalOffset, new Pose2d(1, 1.5, 0));
+            }
             
             // Moving to grab the sample
             setDestinationOffset(finalOffset); // Puts the robot into grabbing position
@@ -933,6 +950,11 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             telemetry.update();
             isTime = true;
             setRotationType(RotationType.SPLINE);
+
+            // if(isFirstSpikeSample) {
+                extendAsync();
+            // }
+
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
 
             // if(getCurrentPosition().heading.toDouble()) {
@@ -944,41 +966,64 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             timer = timeSection("grab_sample_" + (3 - i));
             telemetry.addLine("\n=====> Grabbing the sample...");
             telemetry.update();
-            grabSampleSync(false); // Grab the pixel. and retract
+            grabSampleSync(false, -50 * (2 - i)); // Grab the pixel. and retract
             logTime(timer);
             isTime = false;
+
+            if(!isPossessingSample(currentSampleDistance)) {
+                continue grabDepositLoop;
+            }
 
             timer = timeSection("retract_sync_" + (3 - i));
             retractSync();
             // lift.waitForFinish();
             logTime(timer);
 
+            // Waiting for the arm to go up and out of the way
+            
+            if(!isPossessingSample(currentSampleDistance)) {
+                continue grabDepositLoop;
+            }
+
             timer = timeSection("switch_arm_" + (3 - i));
-            switchArmAsync(); // Switch the arm up; completed by travel time
+            switchArmAsync(); // Switch the arm up
+            // extendToBucketsAsync();
+            // extendToBucketsSync();
+            // lift.waitForFinish();
             logTime(timer);
             
-            // Scoring!
+            // Moving to score
             globalDrive.updatePoseEstimate();
 
             timer = timeSection("move_zone_" + (3 - i));
-            DIST_INCREMENT = 0; // NOTE: change this when roadRunner is tuned
-            DIST_BACK = 7.5 - DIST_INCREMENT * (2 - i);
-            DIST_STRAFE = 2.5;
+            // DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
+            DIST_BACK = 7.2/*  - DIST_INCREMENT * (2 - i) */;
+            DIST_STRAFE = 0;
             SQRT2 = Math.sqrt(2);
             BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
-            setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
-            moveRobotToNetZone(isBlue);
+            setDestinationOffset(BACK_AWAY); // Move back to avoid accidental hanging
+            MecanumDrive.PARAMS.positionTolerance = 0.7;
+            moveRobotToNetZoneCcw(isBlue, new Action() {
+                @Override
+                public boolean run(TelemetryPacket p) {
+                    extendToBucketsAsync();
+                    return false;
+                } 
+            });
+            MecanumDrive.PARAMS.positionTolerance = 1.0;    
             resetDestinationOffset();
             logTime(timer);
-
             
             // Waiting for the pivot to get up before extendning
-            // final double PIVOT_BUCKET_SAFETY = (PIVOT_ALTERNATE_DEPOSIT_POSITION + PIVOT_MIN_POSITION) / 2;
-            lift.waitForSwitch();
+            // lift.waitForSwitch();
             
             // Extending to the buckets
             timer = timeSection("arm_raise_" + (3 - i));
-            extendToBucketsSync();
+            
+            if(!isPossessingSample(currentSampleDistance)) {
+                switchArmAsync();
+                continue grabDepositLoop;
+            }
             lift.waitForFinish();
             logTime(timer);
 
@@ -989,14 +1034,15 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             timer = timeSection("berrideden_of_sample_" + (3 - i));
             berriddenOfSample();
             logTime(timer);
+            isFirstSpikeSample = false;
         }
 
         // Retracting fully after the last basket
-        driveMotorTo(linearSlideLift, 0, 10, -SLIDE_SPEED);
+        driveLiftTo(0, 10, RETRACTION_POWER);
 
         // lift.close();
 
-        // telemetry.clearAll();
+        telemetry.clearAll();
         telemetry.addLine(accumulated);
         telemetry.update();
 
@@ -1035,13 +1081,179 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     @Override
     public void opMode_start() {
         try {
-            main(true);
+            if(!isTeleopMode) { 
+                main(isTeleopMode);
+            } else {
+                lift.start();
+            }
         } catch(InterruptedException err) {
             telemetry.addData("!! CAUGHT FATAL ERROR IN MAIN", err.getMessage());
             telemetry.update();
-            // sleep(5000);
+            sleep(5000);
             // telemetry.clear();
         }
+    }
+
+    private ButtonPressHandler buttonAHandler = null;
+    private ButtonPressHandler buttonBHandler = null;
+    private ButtonPressHandler buttonXHandler = null;
+    private ButtonPressHandler buttonYHandler = null;
+    private ButtonPressHandler buttonUPHandler = null;
+    private ButtonPressHandler buttonDOWNHandler = null;
+    private ButtonPressHandler buttonLEFTHandler = null;
+    private ButtonPressHandler buttonRIGHTHandler = null;
+    private ButtonPressHandler buttonLTHandler = null;
+    private ButtonPressHandler buttonRTHandler = null;
+    private ButtonPressHandler buttonLBHandler = null;
+    private ButtonPressHandler buttonRBHandler = null;
+    private ButtonPressHandler buttonLJHandler = null;
+    private ButtonPressHandler buttonRJHandler = null;
+    private ButtonPressHandler buttonSTARTHandler = null;
+
+    @Override
+    public void opMode_loop() {
+        try {
+            if(isTeleopMode) {
+                teleopLoop();
+            }
+        } catch(Exception e) {
+            telemetry.addData("!!!EXCEPTION!!!", e.toString());
+            telemetry.update();
+        }
+    }
+
+    private boolean a = false;
+    private boolean b = false;
+    private boolean x = false;
+    private boolean y = false;
+    private boolean dpad_up = false;
+    private boolean dpad_down = false;
+    private boolean dpad_left = false;
+    private boolean dpad_right = false;
+    private boolean left_trigger = false;
+    private boolean right_trigger = false;
+    private boolean left_bumper = false;
+    private boolean right_bumper = false;
+    private boolean left_stick_button = false;
+    private boolean right_stick_button = false;
+    private boolean start = false;
+
+    private void teleopLoop() throws InterruptedException, IllegalAccessException, NoSuchFieldException {
+        if(!isTeleopMode) {
+            return;
+        }
+
+        // Look, Ma! It's an age structure diagram!
+        a                  =                   a && gamepad1.a                   ;
+        b                  =                   b && gamepad1.b                   ;
+        x                  =                   x && gamepad1.x                   ;
+        y                  =                   y && gamepad1.y                   ;
+        dpad_up            =             dpad_up && gamepad1.dpad_up             ;
+        dpad_down          =           dpad_down && gamepad1.dpad_down           ;
+        dpad_left          =           dpad_left && gamepad1.dpad_left           ;
+        dpad_right         =          dpad_right && gamepad1.dpad_right          ;
+        left_trigger       =        left_trigger && gamepad1.left_trigger > 0.1  ;
+        right_trigger      =       right_trigger && gamepad1.right_trigger > 0.1 ;    
+        left_bumper        =         left_bumper && gamepad1.left_bumper         ;
+        right_bumper       =        right_bumper && gamepad1.right_bumper        ;
+        left_stick_button  =   left_stick_button && gamepad1.left_stick_button   ;
+        right_stick_button =  right_stick_button && gamepad1.right_stick_button  ;
+        start              =               start && gamepad1.start               ;
+        
+        
+        
+        
+        // 
+        if(gamepad1.a && !a) {switchArmAsync(); a =true;}
+
+        if(gamepad1.b && !b) {extendAsync(); b = true;} // Perferct! (20inches)
+        
+        if(gamepad1.x && !x) {extendSync(0); x = true;} // Perfect!!! (20inches)
+        
+        if(gamepad1.y && !y) {retractAsync(); y = true;} // perfect?
+        
+        if(gamepad1.dpad_up && !dpad_up) {retractSync(); dpad_up = true;} // Worked but left an infinite loop one time
+        
+        if(gamepad1.dpad_down && !dpad_down) {grabSampleAsync(); dpad_down = true;}
+        
+        if(gamepad1.dpad_left && !dpad_left) {depositAsync(); dpad_left = true;} // Stayed in deposit state constantly; functioned otherwise
+        
+        if(gamepad1.dpad_right && !dpad_right) {extendToBucketsAsync(); dpad_right = true;} // Got to position but failed to hold (fell at power 0); see also memory leak
+        
+        if(gamepad1.left_trigger > 0.1 && !left_trigger) {extendToBucketsSync(); left_trigger = true;}
+        
+        if(gamepad1.right_trigger > 0.1 && !right_trigger) {grabSampleSync(true, 0); right_trigger = false;} //
+        
+        if(gamepad1.left_bumper && !left_bumper) {berriddenOfSample(); left_bumper = true;} // Worked, I guess?
+        
+        if(gamepad1.right_bumper && !right_bumper) {switchArmAsync(); right_bumper = true;} // Worked going into deps; never exited from it UNLESS you depositted        
+        
+        // if(buttonHandler) {netMoveSync();}
+        
+        // if(buttonHandler) {moveAndPlaceSpecimen();} 
+
+        // TELEMETRY
+        isTelemetrySuppresed = true;
+        telemetry.setAutoClear(true);
+        telemetry.setMsTransmissionInterval(33);
+        lift.print();
+
+        telemetry.addLine("");
+        telemetry.addLine("");
+        telemetry.addLine("");
+        telemetry.addData("Current State", linearSlideState.name());
+        telemetry.addLine("");
+
+        telemetry.addLine("ACTUATORS");
+        telemetry.addData("LAR POW", linearActuatorRight.getPower());
+        telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("DRIVETRAIN");
+        telemetry.addData("Front R POW", frontRight.getPower());
+        telemetry.addData("Back R POW", backLeft.getPower());
+        telemetry.addData("Front R POW", frontRight.getPower());
+        telemetry.addData("Back L POW", backLeft.getPower());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LIFT SLIDES");
+        telemetry.addData("Slide R POW", linearSlideRight.getPower());
+        telemetry.addData("Slide L POW", linearSlideLeft.getPower());
+        telemetry.addData("Slide R POS", linearSlideRight.getCurrentPosition());
+        telemetry.addData("Slide L POS", linearSlideLeft.getCurrentPosition());
+        telemetry.addData("Slide AVG POS", getLinearSlideAvgPosition());
+        // telemetry.addData("Slide AVG Extension (in)", liftTicksToInches(linearSlideAvgPosition));
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LIFT PIVOTS");
+        telemetry.addData("Pivot R POW", linearPivotRight.getPower());
+        telemetry.addData("Pivot L POW", linearPivotLeft.getPower());
+        telemetry.addData("Pivot R POS", linearPivotRight.getCurrentPosition());
+        telemetry.addData("Pivot L POS", linearPivotLeft.getCurrentPosition());
+        telemetry.addData("Pivot AVG POS", getLinearPivotAvgPosition());
+        // telemetry.addData("Pivot AVG Extension (deg)", 360 / (2 * Math.PI) * pivotTicksToRadians(linearPivotAvgPosition));
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("SERVOS");
+        telemetry.addData("Intake WR POW", intakeWheelR.getPower());
+        telemetry.addData("Intake WL POW", intakeWheelL.getPower());
+        telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
+        telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("SENSORS");
+        telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
+        telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
+        telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
+        telemetry.addLine("(operating range 1-10 centimeters)");
+        telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
+        telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
+        telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LOGIC");
+        telemetry.addData("Specimanning", specimanning);
+        telemetry.addLine("-------------------------");
     }
 
     @Override

@@ -9,6 +9,7 @@ import com.qualcomm.robotcore.hardware.DcMotorSimple;
 import com.qualcomm.robotcore.util.ElapsedTime;
 
 @TeleOp(group = "Z")
+@Deprecated
 @Disabled
 public class AccelerationTest extends LinearOpMode  {
 

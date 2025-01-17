@@ -14,7 +14,7 @@ public class CustomRangeServo extends LinearOpMode {
 
     public void runOpMode() {
 
-        customServo = hardwareMap.get(ServoImplEx.class, "servoLeft");
+        customServo = hardwareMap.get(ServoImplEx.class, "servo");
         customServo.setPwmRange(range);
 
         telemetry.addLine("Press Start");

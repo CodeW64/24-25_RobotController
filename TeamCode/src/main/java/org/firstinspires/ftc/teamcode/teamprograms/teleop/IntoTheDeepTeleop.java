@@ -1,6 +1,7 @@
 package org.firstinspires.ftc.teamcode.teamprograms.teleop;
 
 import com.acmerobotics.dashboard.config.Config;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.CRServo;
@@ -74,6 +75,8 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 
 @TeleOp(name = "The S.S. Steve's Maiden Voyage", group = "A")
 @Config
+@Deprecated
+@Disabled
 public class IntoTheDeepTeleop extends LinearOpMode {
 
 
@@ -291,8 +294,8 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             telemetry.addLine("TELEOP VERSION 1.6.1 RELEASE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
-            telemetry.addLine("CONTROLLER 1  BUTTON A: TANK DRIVE");
-            telemetry.addLine("CONTROLLER 1 BUTTON B: MECANUM DRIVE");
+            telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
+            telemetry.addLine("CONTROLLER 1 LEFT BUMPER: MECANUM DRIVE");
             telemetry.addLine("-------------------------");
             telemetry.addLine("Press Start");
             telemetry.update();
@@ -416,7 +419,7 @@ public class IntoTheDeepTeleop extends LinearOpMode {
             switch (linearSlideState) {
 
             // lift in position to grab samples
-            // speed of intake wheels is at max
+            // speed of intake wheels is at rest
                 case INTAKE_ACTIVE:
 
                     if (!isStateInitialized) {
