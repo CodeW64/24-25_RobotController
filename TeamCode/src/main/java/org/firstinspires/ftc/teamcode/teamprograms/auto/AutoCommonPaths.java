@@ -372,7 +372,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
         final double HALF_TAG_LENGTH = 1.75; // inches
         final double TILE_SIZE = 24;         // In inches
         final double EACH_SPIKE_DIST = 10;   // In inches
-        final double ZERO_DIST = 4;          // Spike 0's distance from wall, in inches
+        final double ZERO_DIST = 2;          // Spike 0's distance from wall, in inches
         final double distFrom = EACH_SPIKE_DIST * markNum + ZERO_DIST;
 
         // Getting the offset from the edge to the center of the spike mark
@@ -451,6 +451,85 @@ abstract public class AutoCommonPaths extends AprilLocater {
             pose = AutoCommonPaths.BLUE_NET;
         }
         lineTo(globalDrive, pose);
+    }
+
+    /**
+     * Moves the robot to the netZone based solely on odometry
+     * 
+     * @param isBlue Whether the robot is on the blue side. This determines 
+     *     which global coordinates to use.
+     */
+    protected void moveRobotToNetZoneCcw(boolean isBlue) {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+
+        
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d offsetTarget = addPoses(pose, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading)
+                .build();
+
+        } else {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading)
+                .build();
+
+        }
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+
+    /**
+     * Moves the robot to the netZone based solely on odometry
+     * 
+     * @param isBlue Whether the robot is on the blue side. This determines 
+     *     which global coordinates to use.
+     * @param action Something to run after the turn
+     */
+    protected void moveRobotToNetZoneCcw(boolean isBlue, Action action) {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+
+        
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d offsetTarget = addPoses(pose, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .stopAndAdd(action)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading)
+                .build();
+
+        } else {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .stopAndAdd(action)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading)
+                .build();
+
+        }
+        Actions.runBlocking(moveToTarget); // Pray 🤞
     }
 
     /**

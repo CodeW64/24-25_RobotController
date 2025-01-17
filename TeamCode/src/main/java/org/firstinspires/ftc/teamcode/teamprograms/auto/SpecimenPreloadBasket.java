@@ -5,6 +5,8 @@ import org.firstinspires.ftc.teamcode.teamprograms.teleop.IntoTheDeepTeleop;
 
 import java.io.Closeable;
 import java.io.IOException;
+import java.lang.reflect.Field;
+import java.lang.reflect.Type;
 import java.util.ArrayList;
 import java.util.concurrent.locks.Condition;
 
@@ -33,7 +35,6 @@ import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 import com.acmerobotics.roadrunner.ftc.Actions;
 // import com.acmerobotics.roadrunner.ftc.Actions;
 
-import java.util.function.DoubleConsumer;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 import java.util.function.DoubleConsumer;
@@ -55,12 +56,13 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private int neutralTagId = AprilLocater.NEUTRAL_BLUE_ID;
     private int coloredTagId = AprilLocater.COLORED_BLUE_ID;
     private boolean repositionEnabled = false;
+    // DEV: This line is true to do testing; please make it false by thurs
+    private boolean isTeleopMode = false; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
 
     private ButtonPressHandler toggleBlueSide;
     private ButtonPressHandler toggleObservationPark;
     private ButtonPressHandler repositionToggle;
-
-    private DcMotorEx linearSlideLift;
+    private ButtonPressHandler teleopModeToggle; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
 
     /**
      * Describes the robot's relative coordinates. That is, the x is width on 
@@ -90,8 +92,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private double sampleSensingDistance;
 
     private int CHAMBER_EXTENSION = 2500;
-    private int EXTEND_TO_SAMPLE_EXTENSION = 1377;
-    private int FULLY_RETRACTED = 0;
+    private int extendToSampleExtension = 500;
+    private int FULLY_RETRACTED = 500;
     
     private double EXTENSION_POWER = 1.0; // Previously 0.15
     private double RETRACTION_POWER = -1.0; // Previous -0.4
@@ -119,7 +121,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         private Boolean isSwitching = false;
         private boolean hasStartedSwitch = true;
         private long pressDuration = 30; // In milliseonds
-        private ArrayList<Closeable> runningThreads = new ArrayList<Closeable>();
+        private ArrayList<ConditionalThread> runningThreads = new ArrayList<ConditionalThread>();
 
         public LiftHandlerThread() {
             super();
@@ -167,6 +169,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 () -> Math.abs(getLinearSlideAvgPosition() - target) <= tolerance,
                 (Boolean unusedParam) -> {
                     // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+                    setFightingGravity(false);
                     linearSlideLeft.setTargetPosition(target);
                     linearSlideLeft.setTargetPositionTolerance(tolerance);
                     linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
@@ -178,12 +181,13 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                     linearSlideRight.setPower(power);
                 },
                 (Boolean unusedParam) -> {
+                    setFightingGravity(true);
                     linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                     linearSlideLeft.setPower(0);
                     linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                     linearSlideRight.setPower(0);
                     setIsExtending(false);
-                    runningThreads.remove(conditionalThread);
+                    runningThreads.remove(extensionThread);
                 }
             );
             runningThreads.add(extensionThread);
@@ -537,7 +541,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // telemetry.addData("Real IMU heading Vel (DEG)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.DEGREES));
         // telemetry.addData("Real IMU heading Vel (RAD)", globalDrive.bildaDriver.getVelocity().getHeading(AngleUnit.RADIANS));
         // telemetry.update();
-        isTelemetrySuppresed = true;
+        isTelemetrySuppresed = false;
         
         // Initializing other hardware(-ish) bits
         globalDrive = new MecanumDrive(hardwareMap, START_LOCATION);
@@ -546,7 +550,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             .getDistance(DistanceUnit.CM);
 
         // lift.start();
-        // initHardware();
+        initHardware();
         
 
         // Creating init_loop options
@@ -556,9 +560,13 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 neutralTagId = isBlue ? AprilLocater.NEUTRAL_BLUE_ID : AprilLocater.NEUTRAL_RED_ID;
                 coloredTagId = isBlue ? AprilLocater.COLORED_BLUE_ID : AprilLocater.COLORED_RED_ID;
             });
-            
+
             repositionToggle = new ButtonPressHandler(gamepad1, "start", (Gamepad g) -> {
                 repositionEnabled = !repositionEnabled;
+            });
+        
+            teleopModeToggle = new ButtonPressHandler(gamepad1, "back", (Gamepad g) -> {
+                isTeleopMode = !isTeleopMode;
             });
         } catch(NoSuchFieldException | NullPointerException err) {
             telemetry.addData("!!CAUGHT BUTTON ERROR", err.getMessage());
@@ -602,6 +610,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private void driveLiftTo(int target, int tolerance, double power) {
         while(Math.abs(getLinearSlideAvgPosition() - target) > tolerance) {
             // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+            setFightingGravity(false);
             linearSlideLeft.setTargetPosition(target);
             linearSlideLeft.setTargetPositionTolerance(tolerance);
             linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
@@ -613,6 +622,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             linearSlideRight.setPower(power);
         }
 
+        setFightingGravity(true);
         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
         linearSlideLeft.setPower(0);
         linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
@@ -628,11 +638,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void extendAsync() throws InterruptedException {
-        lift.extendSlides(EXTEND_TO_SAMPLE_EXTENSION, 10, EXTENSION_POWER);
+        lift.extendSlides(extendToSampleExtension, 10, EXTENSION_POWER);
     }
 
     private void extendSync(int offset) {
-        final int target = EXTEND_TO_SAMPLE_EXTENSION + offset;
+        final int target = extendToSampleExtension + offset;
         final int tolerance = 20;
         final double power = EXTENSION_POWER;
         driveLiftTo(target, tolerance, power);
@@ -685,8 +695,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void depositAsync() throws InterruptedException {
-        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
-        sleep(400);
+        // intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
         intakeWheelR.setPower(INTAKE_POWER_EMPTY);
         intakeWheelL.setPower(INTAKE_POWER_EMPTY);
     }
@@ -728,7 +737,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // lift.waitForExtension(); // Waiting for full extension
 
         retryLoop:
-        while(!isPossessingSample(currentSampleDistance)) {
+        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 3.0) {
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -741,13 +750,18 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
+                && !(lightTimer.seconds() < 1.0 || isPossessingSample(currentSampleDistance))
             ) {
                 sleep(30); // Waiting whilst freeing CPU for other threads
             }
 
             // Exiting the retry loop if we don't want to retry
-            if(!retry) {
-                break retryLoop; 
+            // if(!retry) {
+            //     break retryLoop; 
+            // }
+
+            if(isPossessingSample(currentSampleDistance)) {
+                break retryLoop;
             }
 
             // Moving so that we have more chance of getting it.
@@ -766,11 +780,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private void berriddenOfSample() throws InterruptedException {
         // The arm is raised, so put it into the basket!
         depositAsync();
-        sleep(500); // To stop from accidentally moving too fast
-
-        // Protecting the intake
-        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
-        sleep(300);
+        sleep(200); // To stop from accidentally moving with the sample still in the robot's maw
 
         // Lowering and switching
         switchArmAsync();
@@ -932,8 +942,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // Starting the actual stuffs
         lift.start();
-        SLIDE_CONSTANTS.depositEndRetract = EXTEND_TO_SAMPLE_EXTENSION;
-        SLIDE_CONSTANTS.intakeEndRetract = EXTEND_TO_SAMPLE_EXTENSION;
+        SLIDE_CONSTANTS.intakeEndRetract = 2147000;
+        SLIDE_CONSTANTS.depositEndRetract = extendToSampleExtension;
 
         // Driving to the chamber and scoring
         timer = timeSection("chamber_inital");
@@ -958,9 +968,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         for(int i = 2; i >= 0 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(30) : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = new Pose2d(-6.25, 1.5, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(-20, 0, 0);
+            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = i == 0 ? new Pose2d(-20, 0, 0) : new Pose2d(-7.5, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -972,7 +982,12 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 new Vector2d(/*M12*/-Math.sin(extraRotation), /*M22*/Math.cos(extraRotation))
             };
             final Vector2d rotatedPosition = transformVector(totalOffset.position, rotationMatrix);
-            final Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+            Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
+
+            if(i == 0) {
+                finalOffset = addPoses(finalOffset, new Pose2d(2, 2, 0));
+                extendToSampleExtension = 1377;
+            }
             
             // Moving to grab the sample
             setDestinationOffset(finalOffset); // Puts the robot into grabbing position
@@ -981,6 +996,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             telemetry.update();
             isTime = true;
             setRotationType(RotationType.SPLINE);
+
+            if(isFirstSpikeSample) {
+                extendAsync();
+            }
+
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
 
             // if(getCurrentPosition().heading.toDouble()) {
@@ -1001,32 +1021,33 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             // lift.waitForFinish();
             logTime(timer);
 
+            // Waiting for the arm to go up and out of the way
             timer = timeSection("switch_arm_" + (3 - i));
-            switchArmAsync(); // Switch the arm up; completed by travel time
+            switchArmAsync(); // Switch the arm up
+            // extendToBucketsSync();
+            // lift.waitForFinish();
             logTime(timer);
             
-            // Scoring!
+            // Moving to score
             globalDrive.updatePoseEstimate();
 
             timer = timeSection("move_zone_" + (3 - i));
             final double DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
-            final double DIST_BACK = 9.5/*  - DIST_INCREMENT * (2 - i) */;
+            final double DIST_BACK = 10/*  - DIST_INCREMENT * (2 - i) */;
             final double DIST_STRAFE = 2.5;            
             final double SQRT2 = Math.sqrt(2);
             final Pose2d BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
-            setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
-            moveRobotToNetZone(isBlue);
+            setDestinationOffset(BACK_AWAY); // Move back to avoid accidental hanging
+            moveRobotToNetZoneCcw(isBlue);
             resetDestinationOffset();
             logTime(timer);
-
             
             // Waiting for the pivot to get up before extendning
-            // final double PIVOT_BUCKET_SAFETY = (PIVOT_ALTERNATE_DEPOSIT_POSITION + PIVOT_MIN_POSITION) / 2;
             lift.waitForSwitch();
             
             // Extending to the buckets
             timer = timeSection("arm_raise_" + (3 - i));
-            extendToBucketsSync();
+            extendToBucketsAsync();
             lift.waitForFinish();
             logTime(timer);
 
@@ -1037,6 +1058,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             timer = timeSection("berrideden_of_sample_" + (3 - i));
             berriddenOfSample();
             logTime(timer);
+            isFirstSpikeSample = false;
         }
 
         // Retracting fully after the last basket
@@ -1044,7 +1066,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // lift.close();
 
-        // telemetry.clearAll();
+        telemetry.clearAll();
         telemetry.addLine(accumulated);
         telemetry.update();
 
@@ -1083,13 +1105,185 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     @Override
     public void opMode_start() {
         try {
-            main(true);
+            if(!isTeleopMode) { 
+                main(isTeleopMode);
+            } else {
+                lift.start();
+            }
         } catch(InterruptedException err) {
             telemetry.addData("!! CAUGHT FATAL ERROR IN MAIN", err.getMessage());
             telemetry.update();
-            // sleep(5000);
+            sleep(5000);
             // telemetry.clear();
         }
+    }
+
+    private ButtonPressHandler buttonAHandler = null;
+    private ButtonPressHandler buttonBHandler = null;
+    private ButtonPressHandler buttonXHandler = null;
+    private ButtonPressHandler buttonYHandler = null;
+    private ButtonPressHandler buttonUPHandler = null;
+    private ButtonPressHandler buttonDOWNHandler = null;
+    private ButtonPressHandler buttonLEFTHandler = null;
+    private ButtonPressHandler buttonRIGHTHandler = null;
+    private ButtonPressHandler buttonLTHandler = null;
+    private ButtonPressHandler buttonRTHandler = null;
+    private ButtonPressHandler buttonLBHandler = null;
+    private ButtonPressHandler buttonRBHandler = null;
+    private ButtonPressHandler buttonLJHandler = null;
+    private ButtonPressHandler buttonRJHandler = null;
+    private ButtonPressHandler buttonSTARTHandler = null;
+
+    @Override
+    public void opMode_loop() {
+        try {
+            if(isTeleopMode) {
+                teleopLoop();
+            }
+        } catch(Exception e) {
+            telemetry.addData("!!!EXCEPTION!!!", e.toString());
+            telemetry.update();
+        }
+    }
+
+    private boolean a = false;
+    private boolean b = false;
+    private boolean x = false;
+    private boolean y = false;
+    private boolean dpad_up = false;
+    private boolean dpad_down = false;
+    private boolean dpad_left = false;
+    private boolean dpad_right = false;
+    private boolean left_trigger = false;
+    private boolean right_trigger = false;
+    private boolean left_bumper = false;
+    private boolean right_bumper = false;
+    private boolean left_stick_button = false;
+    private boolean right_stick_button = false;
+    private boolean start = false;
+
+    private void teleopLoop() throws InterruptedException, IllegalAccessException, NoSuchFieldException {
+        if(!isTeleopMode) {
+            return;
+        }
+
+        // Look, Ma! It's an age structure diagram!
+        a                  =                   a && gamepad1.a                   ;
+        b                  =                   b && gamepad1.b                   ;
+        x                  =                   x && gamepad1.x                   ;
+        y                  =                   y && gamepad1.y                   ;
+        dpad_up            =             dpad_up && gamepad1.dpad_up             ;
+        dpad_down          =           dpad_down && gamepad1.dpad_down           ;
+        dpad_left          =           dpad_left && gamepad1.dpad_left           ;
+        dpad_right         =          dpad_right && gamepad1.dpad_right          ;
+        left_trigger       =        left_trigger && gamepad1.left_trigger > 0.1  ;
+        right_trigger      =       right_trigger && gamepad1.right_trigger > 0.1 ;    
+        left_bumper        =         left_bumper && gamepad1.left_bumper         ;
+        right_bumper       =        right_bumper && gamepad1.right_bumper        ;
+        left_stick_button  =   left_stick_button && gamepad1.left_stick_button   ;
+        right_stick_button =  right_stick_button && gamepad1.right_stick_button  ;
+        start              =               start && gamepad1.start               ;
+        
+        
+        
+        
+        // 
+        if(gamepad1.a && !a) {switchArmAsync(); a =true;}
+
+        if(gamepad1.b && !b) {extendAsync(); b = true;} // Perferct! (20inches)
+        
+        if(gamepad1.x && !x) {extendSync(0); x = true;} // Perfect!!! (20inches)
+        
+        if(gamepad1.y && !y) {retractAsync(); y = true;} // perfect?
+        
+        if(gamepad1.dpad_up && !dpad_up) {retractSync(); dpad_up = true;} // Worked but left an infinite loop one time
+        
+        if(gamepad1.dpad_down && !dpad_down) {grabSampleAsync(); dpad_down = true;}
+        
+        if(gamepad1.dpad_left && !dpad_left) {depositAsync(); dpad_left = true;} // Stayed in deposit state constantly; functioned otherwise
+        
+        if(gamepad1.dpad_right && !dpad_right) {extendToBucketsAsync(); dpad_right = true;} // Got to position but failed to hold (fell at power 0); see also memory leak
+        
+        if(gamepad1.left_trigger > 0.1 && !left_trigger) {extendToBucketsSync(); left_trigger = true;}
+        
+        if(gamepad1.right_trigger > 0.1 && !right_trigger) {grabSampleSync(true, 0); right_trigger = false;} //
+        
+        if(gamepad1.left_bumper && !left_bumper) {berriddenOfSample(); left_bumper = true;} // Worked, I guess?
+        
+        if(gamepad1.right_bumper && !right_bumper) {switchArmAsync(); right_bumper = true;} // Worked going into deps; never exited from it UNLESS you depositted        
+        
+        // if(buttonHandler) {netMoveSync();}
+        
+        if(gamepad1.left_stick_button && !left_stick_button) {extendToChambersAsync(); left_stick_button = true;}
+        
+        if(gamepad1.right_stick_button && !right_stick_button) {hookChamber(); right_stick_button = true;}
+        
+        if(gamepad1.start && !start) {pivotDown(); start = true;}
+        
+        // if(buttonHandler) {moveAndPlaceSpecimen();}
+
+        // TELEMETRY
+        isTelemetrySuppresed = true;
+        telemetry.setAutoClear(true);
+        telemetry.setMsTransmissionInterval(33);
+        lift.print();
+
+        telemetry.addLine("");
+        telemetry.addLine("");
+        telemetry.addLine("");
+        telemetry.addData("Current State", linearSlideState.name());
+        telemetry.addLine("");
+
+        telemetry.addLine("ACTUATORS");
+        telemetry.addData("LAR POW", linearActuatorRight.getPower());
+        telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("DRIVETRAIN");
+        telemetry.addData("Front R POW", frontRight.getPower());
+        telemetry.addData("Back R POW", backLeft.getPower());
+        telemetry.addData("Front R POW", frontRight.getPower());
+        telemetry.addData("Back L POW", backLeft.getPower());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LIFT SLIDES");
+        telemetry.addData("Slide R POW", linearSlideRight.getPower());
+        telemetry.addData("Slide L POW", linearSlideLeft.getPower());
+        telemetry.addData("Slide R POS", linearSlideRight.getCurrentPosition());
+        telemetry.addData("Slide L POS", linearSlideLeft.getCurrentPosition());
+        telemetry.addData("Slide AVG POS", getLinearSlideAvgPosition());
+        // telemetry.addData("Slide AVG Extension (in)", liftTicksToInches(linearSlideAvgPosition));
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LIFT PIVOTS");
+        telemetry.addData("Pivot R POW", linearPivotRight.getPower());
+        telemetry.addData("Pivot L POW", linearPivotLeft.getPower());
+        telemetry.addData("Pivot R POS", linearPivotRight.getCurrentPosition());
+        telemetry.addData("Pivot L POS", linearPivotLeft.getCurrentPosition());
+        telemetry.addData("Pivot AVG POS", getLinearPivotAvgPosition());
+        // telemetry.addData("Pivot AVG Extension (deg)", 360 / (2 * Math.PI) * pivotTicksToRadians(linearPivotAvgPosition));
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("SERVOS");
+        telemetry.addData("Intake WR POW", intakeWheelR.getPower());
+        telemetry.addData("Intake WL POW", intakeWheelL.getPower());
+        telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
+        telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("SENSORS");
+        telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
+        telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
+        telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
+        telemetry.addLine("(operating range 1-10 centimeters)");
+        telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
+        telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
+        telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+        telemetry.addLine("-------------------------");
+
+        telemetry.addLine("LOGIC");
+        telemetry.addData("Specimanning", specimanning);
+        telemetry.addLine("-------------------------");
     }
 
     @Override

@@ -93,10 +93,10 @@ public final class MecanumDrive {
         public double maxWheelVel = 50; // 35
 
         // 30 = -30
-        public double minProfileAccel = -30; // -30
+        public double minProfileAccel = -maxWheelVel; // -30
 
         // 30 = 30
-        public double maxProfileAccel = 30; // 30
+        public double maxProfileAccel = maxWheelVel; // 30
 
         // turn profile parameters (in radians)
 
@@ -120,6 +120,10 @@ public final class MecanumDrive {
         public double axialVelGain = 1.0; // 1.0
         public double lateralVelGain = 1.0; // 1.0
         public double headingVelGain = 0.0; // 0.0, shared with turn
+
+        public double positionTolerance = 1.0; // Inches
+        public double headingTolerance = Math.toRadians(5); // Radians
+        public double velTolerance = 5.0; // Distance in/sec
     }
 
     public static class OldParams {
@@ -404,9 +408,9 @@ public final class MecanumDrive {
             // TODO: find the right tolerances
             // UNCOMMENT HERE
             if ((t >= timeTrajectory.duration
-                    && error.position.norm() < 1
-                    && Math.abs(Math.toDegrees(error.heading.toDouble())) < 5
-                    && robotVelRobot.linearVel.norm() < 5)
+                    && error.position.norm() < PARAMS.positionTolerance
+                    && Math.abs(Math.toDegrees(error.heading.toDouble())) < PARAMS.headingTolerance
+                    && robotVelRobot.linearVel.norm() < PARAMS.velTolerance)
                     || t >= timeTrajectory.duration + 1) {
                 leftFront.setPower(0);
                 leftBack.setPower(0);

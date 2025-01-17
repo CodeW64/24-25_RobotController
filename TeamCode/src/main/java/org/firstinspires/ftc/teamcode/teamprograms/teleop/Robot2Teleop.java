@@ -105,7 +105,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double pivotEjectSamplePos = 0.6;
         public double pivotDepositPos = 0.4;
         public double pivotRestPos = 0.52;
-        public double pivotCarryPos = 0.6;
+        public double pivotCarryPos = 0.7;
         public double specimenGrabberOpenPos = 0.58; // adjust
         public double specimenGrabberClosePos = 0.47; // adjust
     }
@@ -153,11 +153,12 @@ public class Robot2Teleop extends LinearOpMode {
     public static StabilizerConstants STABILIZER_CONSTANTS = new StabilizerConstants();
 
     public DistanceGetter heightGetter = (DistanceUnit unit) -> {
-        final double theta = imu.getRobotYawPitchRollAngles().getPitch(AngleUnit.RADIANS); 
-        return 
-            (heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffsetY) 
-            * Math.cos(theta)
-            + STABILIZER_CONSTANTS.heightSensorOffsetX * Math.sin(theta);
+        // final double theta = imu.getRobotYawPitchRollAngles().getPitch(AngleUnit.RADIANS); 
+        // return 
+        //     (heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffsetY) 
+        //     * Math.cos(theta)
+        //     + STABILIZER_CONSTANTS.heightSensorOffsetX * Math.sin(theta);
+        return heightSensor.getDistance(DistanceUnit.INCH) - STABILIZER_CONSTANTS.heightSensorOffsetY;
     };
 
     // SLIDE VARIABLES (editable by FTC dashboard)
@@ -189,8 +190,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double specimenGrabPos = 700; // adjust to right angle
         public double specimenPositionPos = 1200; // adjust to right angle
         public double specimenPlacePos = 1000; // adjust to right angle
-        public double stabilizeReady = 1300;
-
+        public double stabilizeReady = 1310;
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
 
@@ -1620,7 +1620,7 @@ public class Robot2Teleop extends LinearOpMode {
     
                     // make deposit accessible once lift has finished pivoting
                     if (
-                        Math.abs(linearPivotAvgPosition - linearPivotTargetPosition) < 20
+                        Math.abs(linearPivotAvgPosition - linearPivotTargetPosition) < 5
                     ) {
                         checkGTwoDUP = true;
                         isStateInitialized = false;
@@ -1659,7 +1659,7 @@ public class Robot2Teleop extends LinearOpMode {
                     if(!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
 
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
 
@@ -1676,30 +1676,49 @@ public class Robot2Teleop extends LinearOpMode {
                         // linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
                         // linearSlideLeft.setPower(1.0);
                         // linearSlideRight.setPower(1.0);
-                        linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
+                        // linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
+                        linearPivotTargetPosition = (int) linearPivotAvgPosition;
                         isStateInitialized = true;
                     }
     
                     // Moving the arm into position
                     // The arm first moves to position length-wise
-                    boolean isCorrectLength = true;
+                    boolean isCorrectLength = true && gamepad2.dpad_up;
 
-                    if(Math.abs(linearSlideAvgPosition - hookDistInchesToLiftTicks(desiredArmLength)) > 30) {
-                        linearSlideLeft.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
-                        linearSlideRight.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
+                    if(gamepad2.dpad_up && Math.abs(linearSlideAvgPosition - hookDistInchesToLiftTicks(desiredArmLength + 4 * STABILIZER_CONSTANTS.hookRadius)) > 30) {
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
+                        linearSlideLeft.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength + 4 * STABILIZER_CONSTANTS.hookRadius));
+                        linearSlideRight.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength + 4 * STABILIZER_CONSTANTS.hookRadius));
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION); // NOTE: May be optional for-- or impeding on-- Java
                         linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION); // NOTE: May be optional for-- or impeding on-- Java
                         linearSlideLeft.setPower(1.0);
                         linearSlideRight.setPower(1.0);
                         isCorrectLength = false;
+                        // isRunningPivotToPosition = false;
                     }
 
                     // The arm only pivots when the arm is in the correct position
                     boolean isCorrectTheta = isCorrectLength;
                     
                     if(isCorrectLength && Math.abs(linearPivotAvgPosition - radiansToPivotTicks(desiredArmTheta)) > 30) {
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        isRunningPivotToPosition = true;
                         linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
                         isCorrectTheta = false;
+                    }
+
+                    boolean isTrueCorrectLength = isCorrectLength && isCorrectTheta;
+
+                    if(isCorrectLength && isCorrectTheta && Math.abs(linearSlideAvgPosition - hookDistInchesToLiftTicks(desiredArmLength)) > 30) {
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        linearSlideLeft.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
+                        linearSlideRight.setTargetPosition((int) hookDistInchesToLiftTicks(desiredArmLength));
+                        linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION); // NOTE: May be optional for-- or impeding on-- Java
+                        linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION); // NOTE: May be optional for-- or impeding on-- Java
+                        linearSlideLeft.setPower(1.0);
+                        linearSlideRight.setPower(1.0);
+                        isTrueCorrectLength = false;
+                        // isRunningPivotToPosition = false;
                     }
     
                     if(gamepad2.dpad_down) {
@@ -1719,7 +1738,7 @@ public class Robot2Teleop extends LinearOpMode {
                     telemetry.addData("current length", currentArmLength);
     
                     // EXIT
-                    if((isCorrectLength && isCorrectTheta) || (gamepad2.dpad_up && !checkGTwoDUP)) {
+                    if((isCorrectLength && isCorrectTheta && isTrueCorrectLength)/*  || (gamepad2.dpad_up && !checkGTwoDUP) */) {
                         if(gamepad2.dpad_up) {
                             checkGTwoDUP = true;
                         }
@@ -1734,6 +1753,8 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotRight.setPower(0);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.HANG_TIME_AUTOMATIC_HANDS;
+                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+
                     }
     
                     // ABORT
@@ -1988,6 +2009,13 @@ public class Robot2Teleop extends LinearOpMode {
                     linearActuatorLeft.setPower(0);
                     isActuatorInitialized = true;
                 }
+            }
+
+            
+            if(gamepad2.dpad_down) {
+                linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                isActuatorInitialized = true;
             }
 
 

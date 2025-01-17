@@ -98,7 +98,8 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.45;
+        public double pivotIntakePos = 0.40;
+        public double pivotHoverPos = 0.48;
         public double pivotEjectSamplePos = 0.6;
         public double pivotDepositPos = 0.4;
         public double pivotRestPos = 0.52;
@@ -111,7 +112,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     // more servo variables
     final double INTAKE_POWER_MAX = 1.0;
     final double INTAKE_POWER_HOLD = 0.06;
-    final double INTAKE_POWER_EMPTY = -0.3;
+    final double INTAKE_POWER_EMPTY = -1.0;
     final double INTAKE_POWER_ZERO = 0;
 
     // DUCK VALUES (editable by FTC dashboard)
@@ -156,7 +157,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double ki = 0.0;
         public double kd = 0.0; // 0.0002
         public double gravityFeedForward = 0.002;
-        public double retractSetSpeedMultiplier = 0.4;
+        public double retractSetSpeedMultiplier = 1.0;
 
         public double maxPos = 2000;
         public double minPos = 0;
@@ -201,7 +202,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         INTAKE, DEPOSIT, SPECIMEN, HANG
     }
 
-    private ElapsedTime lightTimer, setupTimer, pidTimer, slideTimer;
+    public ElapsedTime lightTimer, setupTimer, pidTimer, slideTimer;
 
     // constant variables
     final double SLIDE_SPEED = 1.0;
@@ -215,18 +216,22 @@ public class AutoArmRunner2 extends LinearOpMode {
     boolean camera = false; // disable if camera not in use or if it doesn't exist
     boolean isRunningPivotToPosition = false;
     boolean specimanning = false;
+    private boolean fightGravity = true; 
 
     protected boolean isStateInitialized = false;
     protected double currentSampleDistance = 0;
 
 
     protected int linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
+    private boolean isHardwareInitialized = false;
 
 
     @Override
     public void runOpMode() {
 
-        initHardware();
+        if(!isHardwareInitialized) {
+            initHardware(); // Init hardware can be called from outside this opmode
+        }
 
         pivotController = new PIDController(PIVOT_CONSTANTS.kp, PIVOT_CONSTANTS.ki, PIVOT_CONSTANTS.kd);
         pivotController.setTolerance(10);
@@ -451,14 +456,14 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                     // attempt to grab a sample (if safe)
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT &&
-                        linearSlideAvgPosition > 350) {
+                        linearSlideAvgPosition > 100) {
                             checkGTwoRT = true;
                             linearSlideRight.setPower(0);
                             linearSlideLeft.setPower(0);
                             isStateInitialized = false;
                             linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
                     } else if (gamepad2.right_bumper && !checkGTwoRB &&
-                        linearSlideAvgPosition > 350) {
+                        linearSlideAvgPosition > 100) {
                         checkGTwoRB = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
@@ -516,7 +521,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                     // SERVOS
                     // finish claw machine grab after a set amount of time
-                    if (lightTimer.seconds() > 0.8) {
+                    if (lightTimer.seconds() > 3.0 || isPossessingSample(currentSampleDistance)) {
 
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
@@ -530,7 +535,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                             // robot did not get sample
                             linearSlideState = LinearSlideStates.INTAKE_EMPTY;
                         }
-                    } else if (lightTimer.seconds() > 0.5) {
+                    } else if (lightTimer.seconds() > 3.0) {
                         // bring intake up for a short period to secure sample
                         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
                     }
@@ -668,8 +673,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-                    if (!limitSwitch) {
-                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                    if (linearSlideAvgPosition >= SLIDE_CONSTANTS.depositEndRetract && !isLinearSlideFullyRetracted(limitSwitch)) {
+                        double timeAccel = 1;
                         linearSlideRight.setPower(-timeAccel);
                         linearSlideLeft.setPower(-timeAccel);
                     } else {
@@ -682,7 +687,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                     // start exiting right before slide hits 0
                     // (attempts to make transition faster and smoother)
                     // slide exit 312RPM-800
-                    if (linearSlideAvgPosition < 570 || isLinearSlideFullyRetracted(limitSwitch)) {
+                    if (linearSlideAvgPosition < SLIDE_CONSTANTS.intakeEndRetract || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
                         if (specimanning) {
                             linearSlideState = LinearSlideStates.PIVOT_TO_SPECIMEN_GRAB;
@@ -727,25 +732,25 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                         lightTimer.reset();
                         isIntakeProtected = true;
-                        isArmPositionSet = false;
+                        isArmPositionSet = true;
                         isStateInitialized = true;
                     }
 
 
                     // stop slides once finished retracting
                     // (slides started retracting in INTAKE_RETRACT)
-                    if (isLinearSlideFullyRetracted(limitSwitch)) {
-                        linearSlideRight.setPower(0);
-                        linearSlideLeft.setPower(0);
-                        linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                        linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        isArmPositionSet = true;
-                    } else if (!isArmPositionSet) {
-                        linearSlideRight.setPower(-SLIDE_SPEED);
-                        linearSlideLeft.setPower(-SLIDE_SPEED);
-                    }
+                    // if (isLinearSlideFullyRetracted(limitSwitch)) {
+                    //     linearSlideRight.setPower(0);
+                    //     linearSlideLeft.setPower(0);
+                    //     linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //     linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //     linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //     linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //     isArmPositionSet = true;
+                    // } else if (!isArmPositionSet) {
+                    //     linearSlideRight.setPower(-SLIDE_SPEED);
+                    //     linearSlideLeft.setPower(-SLIDE_SPEED);
+                    // }
 
 
                     // EXIT
@@ -872,8 +877,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                         isStateInitialized = true;
                     }
 
-                    if (!limitSwitch) {
-                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                    if (linearSlideAvgPosition >= SLIDE_CONSTANTS.depositEndRetract && !isLinearSlideFullyRetracted(limitSwitch)) {
+                        double timeAccel = 1;
                         linearSlideRight.setPower((-timeAccel)+SLIDE_CONSTANTS.gravityCoefficient);
                         linearSlideLeft.setPower((-timeAccel)+SLIDE_CONSTANTS.gravityCoefficient);
                     } else {
@@ -899,25 +904,28 @@ public class AutoArmRunner2 extends LinearOpMode {
 
 
                         lightTimer.reset();
-                        isArmPositionSet = false;
+                        isArmPositionSet = true;
                         isStateInitialized = true;
                     }
+
+                    linearSlideLeft.setPower(0);
+                    linearSlideRight.setPower(0);
 
 
                     // stop slides once finished retracting
                     // (slides started retracting in DEPOSIT_RETRACT)
-                    if (isLinearSlideFullyRetracted(limitSwitch)) {
-                        linearSlideRight.setPower(0);
-                        linearSlideLeft.setPower(0);
-                        linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                        linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
-                        linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
-                        isArmPositionSet = true;
-                    } else if (!isArmPositionSet){
-                        linearSlideRight.setPower(-SLIDE_SPEED);
-                        linearSlideLeft.setPower(-SLIDE_SPEED);
-                    }
+                    // if (isLinearSlideFullyRetracted(limitSwitch)) {
+                    //     linearSlideRight.setPower(0);
+                    //     linearSlideLeft.setPower(0);
+                    //     linearSlideRight.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //     linearSlideLeft.setMode(DcMotor.RunMode.STOP_AND_RESET_ENCODER);
+                    //     linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //     linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                    //     isArmPositionSet = true;
+                    // } else if (!isArmPositionSet){
+                    //     linearSlideRight.setPower(-SLIDE_SPEED);
+                    //     linearSlideLeft.setPower(-SLIDE_SPEED);
+                    // }
 
                     // EXIT
 
@@ -1176,7 +1184,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                         linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
                         isArmPositionSet = true;
                     } else if (!isArmPositionSet) {
-                        double timeAccel = Math.min((lightTimer.seconds()*2), SLIDE_SPEED);
+                        double timeAccel = 1;
                         linearSlideRight.setPower(-timeAccel);
                         linearSlideLeft.setPower(-timeAccel);
                     }
@@ -1360,6 +1368,14 @@ public class AutoArmRunner2 extends LinearOpMode {
 
             
             } // end lift state machine
+
+            // Preventing slide down of gravity if able 
+            if(fightGravity && linearSlideState == LinearSlideStates.DEPOSIT_ACTIVE) {
+                linearSlideLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                linearSlideRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
+                linearSlideLeft.setPower(SLIDE_CONSTANTS.gravityCoefficient);
+                linearSlideRight.setPower(SLIDE_CONSTANTS.gravityCoefficient);
+            }
 
             // run position power controller for pivot
             if (isRunningPivotToPosition) {
@@ -1592,7 +1608,8 @@ public class AutoArmRunner2 extends LinearOpMode {
     /**
      * Initializes all hardware needed to begin teleop
      */
-    private void initHardware() {
+    public void initHardware() {
+        isHardwareInitialized = true;        
 
         // HARDWARE CONFIGURATION
         frontRight = hardwareMap.get(DcMotorEx.class, "frontRight");
@@ -1669,5 +1686,9 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     private double inchesToLiftTicks(double inches) {
         return inches * LIFT_TICKS_PER_INCH_EXTENDED;
+    }
+
+    public void setFightingGravity(boolean bool) {
+        this.fightGravity = bool;
     }
 }
