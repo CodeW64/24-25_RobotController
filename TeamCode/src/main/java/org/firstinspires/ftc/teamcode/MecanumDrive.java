@@ -104,7 +104,7 @@ public final class MecanumDrive {
         public double maxAngVel = 2.880; // shared with path
 
         // 30 = 2.531 ~ Math.toRadians(145)
-        public double maxAngAccel = 2.880; // ~ 165 degrees // 2.880
+        public double maxAngAccel = 4.000; // ~ 165 degrees // 2.880
 
         // path controller gains
 

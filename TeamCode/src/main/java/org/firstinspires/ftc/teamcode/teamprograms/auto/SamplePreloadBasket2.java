@@ -32,6 +32,7 @@ import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
+import com.acmerobotics.dashboard.config.Config;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.acmerobotics.dashboard.telemetry.TelemetryPacket;
 // import com.acmerobotics.roadrunner.ftc.Actions;
@@ -50,6 +51,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
  * 
  * @author Connor Larson
  */
+@Config
 @Autonomous(name="Basket Placer 2 (Preloaded Sample)")
 public class SamplePreloadBasket2 extends AutoCommonPaths {
     private boolean isBlue = true;
@@ -92,13 +94,23 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
     private double sampleSensingDistance;
 
-    private int CHAMBER_EXTENSION = 2500;
-    private int extendToSampleExtension = 1075;
-    private int FULLY_RETRACTED = 500;
+    public static int CHAMBER_EXTENSION = 2500;
+    public static int extendToSampleExtension = 1100;
+    public static int extendToSampleLastExtension = 1300;
+    public static int FULLY_RETRACTED = 500;
     
-    private double EXTENSION_POWER = 1.0; // Previously 0.15
-    private double RETRACTION_POWER = -1.0; // Previous -0.4
-    private boolean isTime = false; // DEV: This is exists for debuggin telemetry
+    public static double DIST_INCREMENT = 0; // NOTE: change this when roadRunner is tuned
+    public static double DIST_BACK = 8.5;
+    public static double DIST_STRAFE = 2.5;
+    public static double SQRT2 = Math.sqrt(2);
+    public static double DIST_BACK_LATER = 8.5;
+    public static double DIST_STRAFE_LATER = 2.5;
+    public static boolean DO_TURN_DEPO = false;
+    
+    public static double EXTENSION_POWER = 1.0; // Previously 0.15
+    public static double RETRACTION_POWER = -1.0; // Previous -0.4
+    public static boolean isTime = false; // DEV: This is exists for debuggin telemetry
+    public boolean goToAscent = false;
 
     public static interface ThreadIdentifiers {
             public static enum Type { UNKNOWN, EXTENSION, SWITCH }
@@ -658,10 +670,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void retractAsync() throws InterruptedException {
+        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
         lift.extendSlides(FULLY_RETRACTED, 30, RETRACTION_POWER);
     }
 
     private void retractSync() {
+        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
         final int target = FULLY_RETRACTED;
         final int tolerance = 50;
         final double power = EXTENSION_POWER;
@@ -700,7 +714,9 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void depositAsync() throws InterruptedException {
-        // intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+        if(DO_TURN_DEPO) {
+            intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
+        }
         intakeWheelR.setPower(INTAKE_POWER_EMPTY);
         intakeWheelL.setPower(INTAKE_POWER_EMPTY);
     }
@@ -746,7 +762,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
 
         retryLoop:
-        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 4.0) {
+        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 4.0 && 30 - getRuntime() >= 5) {
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -760,6 +776,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
                 && lightTimer.seconds() <= 2.0 
+                && 30 - getRuntime() >= 4.5
                 && !isPossessingSample(currentSampleDistance)
             ) {
                 sleep(30); // Waiting whilst freeing CPU for other threads
@@ -794,6 +811,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // The arm is raised, so put it into the basket!
         depositAsync();
         sleep(200); // To stop from accidentally moving with the sample still in the robot's maw
+        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
 
         // Lowering and switching
         switchArmAsync();
@@ -889,22 +907,21 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         intakeWheelR.setPower(INTAKE_POWER_HOLD);
         intakeWheelL.setPower(INTAKE_POWER_HOLD);
 
+        if(extendToSampleExtension == extendToSampleLastExtension) {
+            extendToSampleExtension = 1100;
+        }
+
         // Driving to the chamber and scoring
         timer = timeSection("sample_inital");
         globalDrive.updatePoseEstimate();
 
-        double DIST_INCREMENT = 0; // NOTE: change this when roadRunner is tuned
-        double DIST_BACK = 7.2;
-        double DIST_STRAFE = 0;
-        double SQRT2 = Math.sqrt(2);
         Pose2d BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
         setDestinationOffset(BACK_AWAY); // Move back 4 inches to avoid accidental hanging
         switchArmAsync(); // Get the arm up
         lift.waitForSwitchStart();
 
-        MecanumDrive.PARAMS.positionTolerance = 0.7;
+        // MecanumDrive.PARAMS.positionTolerance = 0.7;
         moveRobotToNetZone(isBlue);
-        MecanumDrive.PARAMS.positionTolerance = 1.0;
         lift.waitForSwitch();
         resetDestinationOffset();
 
@@ -917,10 +934,10 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
         grabDepositLoop:
-        for(int i = 2; i >= 0 && opModeIsActive(); i--) {
+        for(int i = 2; i >= 1 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(30) : 0; // Rotate more cuz' last one's hard to get to. 
+            final double extraRotation = i == 0 ? Math.toRadians(90) : 0; // Rotate more cuz' last one's hard to get to. 
             final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
             final Pose2d grabbingDistance = i == 0 ? new Pose2d(-20, 0, 0) : new Pose2d(-20.0, 0, 0);
             
@@ -937,8 +954,8 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
 
             if(i == 0) {
-                finalOffset = addPoses(finalOffset, new Pose2d(0, 10, 0));
-                extendToSampleExtension = 1300;
+                finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
+                extendToSampleExtension = extendToSampleLastExtension;
             } else {
                 finalOffset = addPoses(finalOffset, new Pose2d(1, 1.5, 0));
             }
@@ -966,13 +983,21 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             timer = timeSection("grab_sample_" + (3 - i));
             telemetry.addLine("\n=====> Grabbing the sample...");
             telemetry.update();
-            grabSampleSync(false, -50 * (2 - i)); // Grab the pixel. and retract
+            grabSampleSync(false, 0); // Grab the pixel. and retract
             logTime(timer);
             isTime = false;
 
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
+
+            // if(30 - getRuntime() <= 4.0) {
+
+            //     if(30 - getRuntime() >= 1.0) {
+            //         goToAscent = true;
+            //     }
+            //     break grabDepositLoop;
+            // }
 
             timer = timeSection("retract_sync_" + (3 - i));
             retractSync();
@@ -997,12 +1022,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
             timer = timeSection("move_zone_" + (3 - i));
             // DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
-            DIST_BACK = 7.2/*  - DIST_INCREMENT * (2 - i) */;
-            DIST_STRAFE = 0;
+            DIST_BACK = DIST_BACK_LATER/*  - DIST_INCREMENT * (2 - i) */;
+            DIST_STRAFE = DIST_STRAFE_LATER;
             SQRT2 = Math.sqrt(2);
             BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
             setDestinationOffset(BACK_AWAY); // Move back to avoid accidental hanging
-            MecanumDrive.PARAMS.positionTolerance = 0.7;
+            // MecanumDrive.PARAMS.positionTolerance = 0.7;
             moveRobotToNetZoneCcw(isBlue, new Action() {
                 @Override
                 public boolean run(TelemetryPacket p) {
@@ -1013,7 +1038,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             MecanumDrive.PARAMS.positionTolerance = 1.0;    
             resetDestinationOffset();
             logTime(timer);
-            
+
             // Waiting for the pivot to get up before extendning
             // lift.waitForSwitch();
             
@@ -1036,9 +1061,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             logTime(timer);
             isFirstSpikeSample = false;
         }
+        lift.extendSlides(0, 30, -1.0);
 
-        // Retracting fully after the last basket
-        driveLiftTo(0, 10, RETRACTION_POWER);
+        // if(goToAscent) {
+            // setDestinationOffset(new Pose2d(0, 24, 0));
+            // moveRobotToAscent(); 
+        // }
+
+        lift.waitForFinish();
 
         // lift.close();
 
@@ -1053,7 +1083,6 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // final AprilTagDetection observationZone = getDetection(this.coloredTagId);
         // if(this.shouldParkObservation) {
         //     globalDrive.updatePoseEstimate();
-        //     moveRobotToObservation(observationZone, false); 
         // } else {
         //     globalDrive.updatePoseEstimate();
         //     moveRobotToAscentZone(observationZone);

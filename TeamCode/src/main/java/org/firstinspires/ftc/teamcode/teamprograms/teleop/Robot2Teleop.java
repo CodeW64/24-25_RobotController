@@ -1462,7 +1462,7 @@ public class Robot2Teleop extends LinearOpMode {
                     }
 
                     // set power to lift motors
-                    linearSlidePower += calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.INTAKE);
+                    linearSlidePower += calculateSlidePower(linearSlideAvgPosition, ExtensionLimits.DEPOSIT);
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
@@ -2266,11 +2266,11 @@ public class Robot2Teleop extends LinearOpMode {
             } // end actuator switch statement
 
             
-            if(gamepad2.dpad_down) {
-                linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                isActuatorInitialized = true;
-            }
+            // if(gamepad2.dpad_down) {
+            //     linearActuatorRight.setPower(-ACTUATOR_SPEED);
+            //     linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+            //     isActuatorStateInitialized = true;
+            // }
 
 
 
@@ -2552,7 +2552,7 @@ public class Robot2Teleop extends LinearOpMode {
         double pivotFF = Math.cos(Math.toRadians(pivotPosition / PIVOT_TICKS_PER_DEGREE + 1)) * PIVOT_CONSTANTS.gravityFeedForward;
 
         // set power
-        pivotPower = (-gamepad2.left_stick_y)*(PIVOT_SPEED*0.7)*pivotCushion;
+        pivotPower = (-gamepad2.left_stick_y)*(PIVOT_SPEED*0.25)*pivotCushion;
 
         // apply a factor to fight gravity if needed (works and doesn't work at the same time)
         // note that this does not account for the added load due to lever action

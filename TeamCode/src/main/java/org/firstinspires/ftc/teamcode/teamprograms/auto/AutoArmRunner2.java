@@ -144,7 +144,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double extensionLimitSpecimen = 2700.0; // 312RPM-3800 // FIXME: adjust to fit within limit
         public double extensionLimitHang = 2700.0; // 312RPM-3800
         public double cushionRatio = 400.0;
-        public double topBucketHeightAlternate = 2930.0; // 312RPM-4100
+        public double topBucketHeightAlternate = 3050; // 312RPM-4100
         public double depositEndRetract = 1800;
         public double intakeEndRetract = 800;
     }
