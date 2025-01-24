@@ -25,7 +25,8 @@ import org.firstinspires.ftc.teamcode.teamprograms.DistanceGetter;
 /**
  * Welcome! <br>
  * Teleop Version: <strong>2.9.0 RELEASE</strong> <br>
- * STARTING POSITION/STATE: <strong>INTAKE_ACTIVE</strong>
+ * STARTING POSITION/STATE: <strong>INTAKE_ACTIVE</strong> <br>
+ * Please note: this program may be a crime scene of comments and technical debt.
  **/
 
  /*--------------------------
@@ -2579,6 +2580,10 @@ public class Robot2Teleop extends LinearOpMode {
         }
 
         if (limit == ExtensionLimits.HANG) {
+            // make it so the robot doesn't drop itself when trying to adjust height
+            if ((-gamepad2.right_stick_y) > 0) {
+                linearSlidePower*=0.5;
+            }
             // apply a coefficient to fight gravity (slide holds power to retract)
             linearSlidePower-=SLIDE_CONSTANTS.gravityCoefficient;
         }
