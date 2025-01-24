@@ -133,7 +133,7 @@
 //             conditionalThread.finishInitialization(
 //                 () -> Math.abs(linearSlideLift.getCurrentPosition() - target) <= tolerance,
 //                 (Boolean unusedParam) -> {
-//                     // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+//                     // driveMotorToTo(linearSlideLift, target, tolerance, power);
 //                     driveSlidesTo(target, tolerance, power);
 //                 },
 //                 (Boolean unusedParam) -> {
@@ -593,7 +593,7 @@
 //     }
 
 //     private void extendSync() {
-//         AutoInit.driveMotorTo(
+//         driveMotorToTo(
 //             linearSlideLift, 
 //             TWELVE_INCHES_EXTENSION, 
 //             10, 
@@ -614,7 +614,7 @@
 //     }
 
 //     private void retractSync() {
-//         AutoInit.driveMotorTo(
+//         driveMotorToTo(
 //             linearSlideLift,
 //             FULLY_RETRACTED, 
 //             30, 
@@ -669,7 +669,7 @@
 //     }
 
 //     private void extendToBucketsSync() {
-//         AutoInit.driveMotorTo(
+//         driveMotorToTo(
 //             linearSlideLift,
 //             (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
 //             10, 
@@ -786,7 +786,7 @@
 //     }
 
 //     private void pivotDown() throws InterruptedException {
-//         AutoInit.driveMotorTo(
+//         driveMotorToTo(
 //             linearSlidePivot, 
 //             PIVOT_HANG_SPECIMEN, 
 //             10, 

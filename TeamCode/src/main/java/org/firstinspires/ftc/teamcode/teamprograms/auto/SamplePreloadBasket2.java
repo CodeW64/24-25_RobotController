@@ -8,6 +8,7 @@ import java.io.IOException;
 import java.lang.reflect.Field;
 import java.lang.reflect.Type;
 import java.util.ArrayList;
+import java.util.ConcurrentModificationException;
 import java.util.concurrent.locks.Condition;
 
 import com.qualcomm.robotcore.hardware.Gamepad;
@@ -93,13 +94,15 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     );
 
     private double sampleSensingDistance;
+    
+    public static double SECONDS_CLOSE_TIMEOUT = 0.5;
 
     public static int CHAMBER_EXTENSION = 2500;
     public static int extendToSampleExtension = 1100;
     public static int extendToSampleLastExtension = 1300;
     public static int FULLY_RETRACTED = 500;
     
-    public static double DIST_INCREMENT = 0; // NOTE: change this when roadRunner is tuned
+    public static double DIST_INCREMENT = -0.5; // NOTE: change this when roadRunner is tuned
     public static double DIST_BACK = 8.5;
     public static double DIST_STRAFE = 2.5;
     public static double SQRT2 = Math.sqrt(2);
@@ -158,16 +161,17 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         public void extendSlides(int target, int tolerance, double power) {
             if(getIsExtending()) {
                 // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
-                for(final ConditionalThread thread : runningThreads) {
+                for(int i = 0; i < runningThreads.size(); i++) {
+                    final ConditionalThread thread = runningThreads.get(i);
                     if(thread.identifiers.getType() == ThreadIdentifiers.EXTENSION) {
                         thread.close();
                         runningThreads.remove(thread);
+                        i--;
                     }
                 }
             }
             
             setIsExtending(true);
-            // TODO: Add id's to the threads? 
             final ConditionalThread extensionThread = new ConditionalThread(new ThreadIdentifiers() {
                 public Type getType() {
                    return ThreadIdentifiers.EXTENSION; 
@@ -181,7 +185,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             extensionThread.finishInitialization(
                 () -> Math.abs(getLinearSlideAvgPosition() - target) <= tolerance,
                 (Boolean unusedParam) -> {
-                    // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+                    // driveMotorToTo(linearSlideLift, target, tolerance, power);
                     setFightingGravity(false);
                     linearSlideLeft.setTargetPosition(target);
                     linearSlideLeft.setTargetPositionTolerance(tolerance);
@@ -240,10 +244,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         public void switchArmMode() {
             if(getIsSwitching()) {
                 // Closing (canceling) any other extension threads to prevent race conditions and memory leaks
-                for(final ConditionalThread thread : runningThreads) {
+                for(int i = 0; i < runningThreads.size(); i++) {
+                    final ConditionalThread thread = runningThreads.get(i);
                     if(thread.identifiers.getType() == ThreadIdentifiers.SWITCH) {
                         thread.close();
                         runningThreads.remove(thread);
+                        i--;
                     }
                 }
             }
@@ -255,7 +261,6 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             hasStartedSwitch = true;
             
             // Initialize the process for switiching
-            // TODO: Add id's to the threads? 
             final ConditionalThread buttonPresser = new ConditionalThread("switchArmMode.buttonPresser", ThreadIdentifiers.SWITCH);
             final ConditionalThread armSwitcher = new ConditionalThread("switchArmMode.armSwitcher", ThreadIdentifiers.SWITCH);
 
@@ -293,8 +298,6 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             hasStartedSwitch = false;
             
             // Initialize the process for switiching
-            // TODO: Add id's to the threads? 
-
             final ConditionalThread buttonPresser = new ConditionalThread("switchToChamber.buttonPresser", ThreadIdentifiers.SWITCH);
             final ConditionalThread armSwitcher = new ConditionalThread("switchToChamber.armSwithcer", ThreadIdentifiers.SWITCH);
 
@@ -340,16 +343,18 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         @Override
         public void close() {
+            final ElapsedTime closeTimer = new ElapsedTime();
+            closeTimer.reset();
             isOpen = false;
-            for(Closeable closeableThread : runningThreads) {
+            for(int i = 0; i < runningThreads.size() && closeTimer.seconds() < SECONDS_CLOSE_TIMEOUT; i++) {
+                final Closeable closeableThread = runningThreads.get(i);
                 try {
                     closeableThread.close();
-                } catch(IOException err) {
-                    telemetry.addData("...wat o_O", err.getMessage());
-                    telemetry.update();
+                } catch(IOException | ConcurrentModificationException err) {
                 }
-                runningThreads.remove(closeableThread);
+                // i--;
             }
+            runningThreads.clear();
             interrupt();
         }
 
@@ -358,7 +363,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * this object to have finished waiting asynchronously.
          */
         public void waitForFinish() throws InterruptedException {
-            while(getIsWaiting() && isOpen) {
+            while((getIsWaiting() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }
         }
@@ -368,7 +373,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * to have finished executing the arm switch.
          */
         public void waitForSwitch() throws InterruptedException {
-            while(getIsSwitching() && isOpen) {
+            while((getIsSwitching() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }    
         }
@@ -378,7 +383,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * to have finished extending/retracting to the positioin.
          */
         public void waitForExtension() throws InterruptedException {
-            while(getIsExtending() && isOpen) {
+            while((getIsExtending() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }
         }
@@ -388,7 +393,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
          * to have registered the button press and started the switch
          */
         public void waitForSwitchStart() throws InterruptedException {
-            while(!getHasStartedSwitch() && isOpen) {
+            while((!getHasStartedSwitch() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }    
         }
@@ -507,14 +512,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         public void run() {
             boolean currentBoolean; 
             try {
-                while(currentBoolean = (!condition.getAsBoolean() && isOpen)) {
+                while((currentBoolean = (!condition.getAsBoolean() && isOpen)) && opModeIsActive()) {
                     onContinue.accept(currentBoolean);
                     Thread.sleep(30); // Allow for the process in other threads to continue;
                 }
 
                 onFinish.accept(!condition.getAsBoolean());
             } catch(InterruptedException err) {
-                telemetry.addData("Interupted Running Conditional Thread: ", err.getMessage());
+                // telemetry.addData("Interupted Running Conditional Thread: ", err.getMessage());
             }
         }
     
@@ -621,8 +626,8 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     }
 
     private void driveLiftTo(int target, int tolerance, double power) {
-        while(Math.abs(getLinearSlideAvgPosition() - target) > tolerance) {
-            // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+        while((Math.abs(getLinearSlideAvgPosition() - target) > tolerance) && opModeIsActive()) {
+            // driveMotorToTo(linearSlideLift, target, tolerance, power);
             setFightingGravity(false);
             linearSlideLeft.setTargetPosition(target);
             linearSlideLeft.setTargetPositionTolerance(tolerance);
@@ -762,7 +767,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
 
         retryLoop:
-        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 4.0 && 30 - getRuntime() >= 5) {
+        while(
+            (
+                !isPossessingSample(currentSampleDistance) 
+                && lightTimer.seconds() <= 4.0 
+                && 30 - getRuntime() >= 5
+            )
+            && opModeIsActive()
+        ) {
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -772,12 +784,15 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             telemetry.update();
             // CAPUT MEUM DOLET.
             while(
-                !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
-                && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
-                && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
-                && lightTimer.seconds() <= 2.0 
-                && 30 - getRuntime() >= 4.5
-                && !isPossessingSample(currentSampleDistance)
+                (
+                    !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
+                    && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
+                    && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
+                    && lightTimer.seconds() <= 2.0 
+                    && 30 - lightTimer.seconds() >= 4.5
+                    && !isPossessingSample(currentSampleDistance)
+                )
+                && opModeIsActive()
             ) {
                 sleep(30); // Waiting whilst freeing CPU for other threads
             }
@@ -793,7 +808,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
             // Moving so that we have more chance of getting it.
             hoverSampleAsync();
-            setDestinationOffset(new Pose2d(1, 2, 0)); // Move from current position forward and a sample up
+            setDestinationOffset(new Pose2d(1, 0, 0)); // Move from current position forward and a sample up
             lineTo(globalDrive, getCurrentPosition());
             resetDestinationOffset();
         }
@@ -920,14 +935,20 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         switchArmAsync(); // Get the arm up
         lift.waitForSwitchStart();
 
+        MecanumDrive.PARAMS.positionTolerance = 0.7;
+        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(30));
+        MecanumDrive.PARAMS.positionTolerance = 1.0;
+
         // MecanumDrive.PARAMS.positionTolerance = 0.7;
         moveRobotToNetZone(isBlue);
         lift.waitForSwitch();
+
         resetDestinationOffset();
 
         // Putting the preloaded sample into the basket
         extendToBucketsAsync(); // Extend there
         lift.waitForFinish();
+
         // netMoveSync(8); // Move forward 8 inches
         berriddenOfSample(); // Aaaaand deposit and return!
 
@@ -987,9 +1008,9 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             logTime(timer);
             isTime = false;
 
-            if(!isPossessingSample(currentSampleDistance)) {
-                continue grabDepositLoop;
-            }
+            // if(!isPossessingSample(currentSampleDistance) || i != 0) {
+            //     continue grabDepositLoop;
+            // }
 
             // if(30 - getRuntime() <= 4.0) {
 
@@ -1006,9 +1027,9 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
             // Waiting for the arm to go up and out of the way
             
-            if(!isPossessingSample(currentSampleDistance)) {
-                continue grabDepositLoop;
-            }
+            // if(!isPossessingSample(currentSampleDistance) && i != 0) {
+            //     continue grabDepositLoop;
+            // }
 
             timer = timeSection("switch_arm_" + (3 - i));
             switchArmAsync(); // Switch the arm up
@@ -1021,20 +1042,19 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             globalDrive.updatePoseEstimate();
 
             timer = timeSection("move_zone_" + (3 - i));
-            // DIST_INCREMENT = 0.5; // NOTE: change this when roadRunner is tuned
-            DIST_BACK = DIST_BACK_LATER/*  - DIST_INCREMENT * (2 - i) */;
+            DIST_BACK = DIST_BACK_LATER - DIST_INCREMENT * (2 - i);
             DIST_STRAFE = DIST_STRAFE_LATER;
             SQRT2 = Math.sqrt(2);
             BACK_AWAY = new Pose2d((DIST_BACK + DIST_STRAFE) / SQRT2, (DIST_STRAFE - DIST_BACK) / SQRT2, 0); // don't go too close to the buckets
             setDestinationOffset(BACK_AWAY); // Move back to avoid accidental hanging
-            // MecanumDrive.PARAMS.positionTolerance = 0.7;
+            MecanumDrive.PARAMS.positionTolerance = 0.7;
             moveRobotToNetZoneCcw(isBlue, new Action() {
                 @Override
                 public boolean run(TelemetryPacket p) {
                     extendToBucketsAsync();
                     return false;
                 } 
-            });
+            }, new TranslationalVelConstraint(30));
             MecanumDrive.PARAMS.positionTolerance = 1.0;    
             resetDestinationOffset();
             logTime(timer);
@@ -1098,6 +1118,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         telemetry.addData("Status", "Completed! 🥳");
         telemetry.update();
     }
+
     // private void main(boolean arg) throws InterruptedException {
     //     lift.start();
     //     sleep(5000);
@@ -1118,7 +1139,6 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         } catch(InterruptedException err) {
             telemetry.addData("!! CAUGHT FATAL ERROR IN MAIN", err.getMessage());
             telemetry.update();
-            sleep(5000);
             // telemetry.clear();
         }
     }
@@ -1287,7 +1307,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
     @Override
     public void opMode_stop() {
-        powerDriveMotors(0, 0, 0, 0);
+        // powerDriveMotors(0, 0, 0, 0);
         lift.close();
     }
 }

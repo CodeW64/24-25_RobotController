@@ -168,7 +168,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             extensionThread.finishInitialization(
                 () -> Math.abs(getLinearSlideAvgPosition() - target) <= tolerance,
                 (Boolean unusedParam) -> {
-                    // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+                    // driveMotorToTo(linearSlideLift, target, tolerance, power);
                     setFightingGravity(false);
                     linearSlideLeft.setTargetPosition(target);
                     linearSlideLeft.setTargetPositionTolerance(tolerance);
@@ -345,7 +345,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * this object to have finished waiting asynchronously.
          */
         public void waitForFinish() throws InterruptedException {
-            while(getIsWaiting() && isOpen) {
+            while((getIsWaiting() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }
         }
@@ -355,7 +355,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * to have finished executing the arm switch.
          */
         public void waitForSwitch() throws InterruptedException {
-            while(getIsSwitching() && isOpen) {
+            while((getIsSwitching() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }    
         }
@@ -365,7 +365,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * to have finished extending/retracting to the positioin.
          */
         public void waitForExtension() throws InterruptedException {
-            while(getIsExtending() && isOpen) {
+            while((getIsExtending() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }
         }
@@ -375,7 +375,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
          * to have registered the button press and started the switch
          */
         public void waitForSwitchStart() throws InterruptedException {
-            while(!getHasStartedSwitch() && isOpen) {
+            while((!getHasStartedSwitch() && isOpen) && opModeIsActive()) {
                 Thread.sleep(30); // Wait and give breathing room to the other thread(s)
             }    
         }
@@ -494,7 +494,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         public void run() {
             boolean currentBoolean; 
             try {
-                while(currentBoolean = (!condition.getAsBoolean() && isOpen)) {
+                while((currentBoolean = (!condition.getAsBoolean() && isOpen)) && opModeIsActive()) {
                     onContinue.accept(currentBoolean);
                     Thread.sleep(30); // Allow for the process in other threads to continue;
                 }
@@ -608,8 +608,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     }
 
     private void driveLiftTo(int target, int tolerance, double power) {
-        while(Math.abs(getLinearSlideAvgPosition() - target) > tolerance) {
-            // AutoInit.driveMotorTo(linearSlideLift, target, tolerance, power);
+        while((Math.abs(getLinearSlideAvgPosition() - target) > tolerance) && opModeIsActive()) {
+            // driveMotorToTo(linearSlideLift, target, tolerance, power);
             setFightingGravity(false);
             linearSlideLeft.setTargetPosition(target);
             linearSlideLeft.setTargetPositionTolerance(tolerance);
@@ -737,7 +737,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // lift.waitForExtension(); // Waiting for full extension
 
         retryLoop:
-        while(!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 3.0) {
+        while((!isPossessingSample(currentSampleDistance) && lightTimer.seconds() <= 3.0) && opModeIsActive()) {
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -751,6 +751,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                 && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
                 && !(lightTimer.seconds() < 1.0 || isPossessingSample(currentSampleDistance))
+                && opModeIsActive()
             ) {
                 sleep(30); // Waiting whilst freeing CPU for other threads
             }
@@ -853,7 +854,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     
         // Wait for the pivot to be reasonably rotated before extending 
         final double bound = (PIVOT_CONSTANTS.specimenPositionPos + PIVOT_CONSTANTS.minPos) / 2;
-        while(getLinearPivotAvgPosition() < bound) {
+        while((getLinearPivotAvgPosition() < bound) && opModeIsActive()) {
             sleep(30); // Give time to other threads to do their thang
         }
 
@@ -887,7 +888,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         hookChamber();
         
         // Waiting for the hook to fully... well, hook.
-        while(getLinearSlideAvgPosition() >= FULLY_RETRACTED + 30) {
+        while((getLinearSlideAvgPosition() >= FULLY_RETRACTED + 30) && opModeIsActive()) {
             sleep(30); // Wait whiling freeing up CPU for other threads.
         }
     }

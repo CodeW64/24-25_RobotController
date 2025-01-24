@@ -460,8 +460,26 @@ abstract public class AutoCommonPaths extends AprilLocater {
         if(isBlue) {
             pose = AutoCommonPaths.BLUE_NET;
         }
-        lineTo(globalDrive, pose, new TranslationalVelConstraint(30));
+        lineTo(globalDrive, pose);
     }
+
+    
+    /**
+     * Moves the robot to the netZone based solely on odometry
+     * 
+     * @param isBlue Whether the robot is on the blue side. This determines 
+     *     which global coordinates to use.
+     */
+    protected void moveRobotToNetZone(boolean isBlue, TranslationalVelConstraint cont) {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+        lineTo(globalDrive, pose, cont);
+    }
+
 
     /**
      * Moves the robot to the netZone based solely on odometry
@@ -536,6 +554,40 @@ abstract public class AutoCommonPaths extends AprilLocater {
                 .stopAndAdd(action)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading)
+                .build();
+
+        }
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+
+    protected void moveRobotToNetZoneCcw(boolean isBlue, Action action, TranslationalVelConstraint cont) {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+
+        
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d offsetTarget = addPoses(pose, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .stopAndAdd(action)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading, cont)
+                .build();
+
+        } else {
+            moveToTarget = globalDrive.actionBuilder(currentPos)
+                .turnTo(Math.toRadians(-90))
+                .stopAndAdd(action)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading, cont)
                 .build();
 
         }
