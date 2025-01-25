@@ -104,14 +104,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     public static double ONE_RETRY_MAX_SECONDS = 1.1;
 
     public static int CHAMBER_EXTENSION = 2500;
-    public static int EXTEND_TO_SAMPLE_EXTENSION = 1300;
+    public static int EXTEND_TO_SAMPLE_EXTENSION = 1150;
     public static int EXTEND_TO_SAMPLE_LAST_EXTENSION = 1300;
     public static int FULLY_RETRACTED = 500;
     
     public static double NET_ZONE_TOLERANCE = 0.7;
 
     public static double SQRT2 = Math.sqrt(2); // approx 1.4142
-    public static double DIST_BACK = 8.8;
+    public static double DIST_BACK = 8.1;
     public static double DIST_BACK_LATER = 8.8;
     public static double DIST_INCREMENT = -0.5; // NOTE: change this when roadRunner is tuned
     public static double DIST_STRAFE = 2.5;
@@ -737,12 +737,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void retractAsync() throws InterruptedException {
-        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         lift.extendSlides(FULLY_RETRACTED, 30, RETRACTION_POWER);
     }
 
     private void retractSync() {
-        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         final int target = FULLY_RETRACTED;
         final int tolerance = 50;
         final double power = EXTENSION_POWER;
@@ -833,7 +833,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             (
                 !isPossessingSample(currentSampleDistance) 
                 && lightTimer.seconds() <= 4.0 
-                && 30 - getRuntime() >= 5 // FIXME: Make this acutally representative of time left
+                // && 30 - getRuntime() >= 5 // FIXME: Make this acutally representative of time left
             )
             && opModeIsActive()
         ) {
@@ -851,7 +851,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
                     && lightTimer.seconds() <= 2.0 
-                    && 30 - lightTimer.seconds() >= 4.5 // FIXME: Make this actually representative of rime left
+                    // && 30 - lightTimer.seconds() >= 4.5 // FIXME: Make this actually representative of rime left
                     && !isPossessingSample(currentSampleDistance)
                 )
                 && opModeIsActive()
@@ -1157,8 +1157,11 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             moveRobotToNetZoneCcw(isBlue, new Action() {
                 @Override
                 public boolean run(TelemetryPacket p) {
-                    extendToBucketsAsync(); // Extend to the buckets once we have done our signature turn.
-                    return false;
+                    if(lift.hasFinishedPivot()) {
+                        extendToBucketsAsync(); // Extend to the buckets once we have done our signature turn.
+                        return false;
+                    }
+                    return true;
                 } 
             }, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-30, 30));
             MecanumDrive.PARAMS.positionTolerance = 1.0;    
@@ -1176,6 +1179,8 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             logTime(timer);
             isFirstSpikeSample = false;
         }
+
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         lift.extendSlides(0, 30, -1.0);
 
         // if(goToAscent) {

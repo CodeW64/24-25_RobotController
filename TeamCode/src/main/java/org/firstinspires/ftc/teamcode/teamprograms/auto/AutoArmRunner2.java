@@ -98,12 +98,12 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.30;
-        public double pivotHoverPos = 0.38;
-        public double pivotEjectSamplePos = 0.5;
-        public double pivotDepositPos = 0.3;
-        public double pivotRestPos = 0.42;
-        public double pivotCarryPos = 0.5;
+        public double pivotCarryPos = 0.23;
+        public double pivotDepositPos = 0.172;
+        public double pivotEjectSamplePos = 0.218;
+        public double pivotIntakePos = 0.1825;
+        public double pivotHoverPos = 0.195;
+        public double pivotRestPos = 0.195;
         public double specimenGrabberOpenPos = 0.58; // adjust
         public double specimenGrabberClosePos = 0.47; // adjust
     }
@@ -174,6 +174,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     public final static double PIVOT_TICKS_PER_DEGREE = 2000.0 / 90.0; // (motor PPR / gear ratio) / 360
     public final static double PIVOT_TICKS_PER_RAD = PIVOT_TICKS_PER_DEGREE * 180 / Math.PI;
+    public static double PIVOT_DOWN_POWER = 1.0;
 
     public final static double LIFT_TICKS_PER_INCH_EXTENDED = 384.5 / 537.7 * 3450.0 / 30.0;
 
@@ -462,6 +463,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                             linearSlideLeft.setPower(0);
                             isStateInitialized = false;
                             linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
+                            pivotPIDSpeedMultiplier = 1.0;
                     } else if (gamepad2.right_bumper && !checkGTwoRB &&
                         linearSlideAvgPosition > 100) {
                         checkGTwoRB = true;
@@ -469,6 +471,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_DIVIDE_SAMPLE;
+                        pivotPIDSpeedMultiplier = 1.0;
                     }
 
 
@@ -488,6 +491,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT;
+                        pivotPIDSpeedMultiplier = 1.0;
                     }
 
                     // start sequence to pivot to specimen
@@ -503,6 +507,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT;
+                        pivotPIDSpeedMultiplier = 1.0;
                     }
                     break;
 
@@ -902,7 +907,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
 
-
+                        pivotPIDSpeedMultiplier = PIVOT_DOWN_POWER;
                         lightTimer.reset();
                         isArmPositionSet = true;
                         isStateInitialized = true;

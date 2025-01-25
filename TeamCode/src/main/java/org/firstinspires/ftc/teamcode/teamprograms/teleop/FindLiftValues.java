@@ -28,9 +28,11 @@ public class FindLiftValues extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.44;
-        public double pivotDepositPos = 0.85;
-        public double pivotRestPos = 0.52;
+        public double pivotCarryPos = 0.23;
+        public double pivotDepositPos = 0.172;
+        public double pivotEjectSamplePos = 0.218;
+        public double pivotIntakePos = 0.1825;
+        public double pivotRestPos = 0.195;
 
         public double intakePowerMax = 1.0;
 

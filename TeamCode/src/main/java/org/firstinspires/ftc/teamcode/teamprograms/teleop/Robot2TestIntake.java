@@ -31,11 +31,11 @@ public class Robot2TestIntake extends LinearOpMode {
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
 
     public static class ServoValues {
-        public double pivotIntakePos = 0.45;
-        public double pivotEjectSamplePos = 0.6;
-        public double pivotDepositPos = 0.4;
-        public double pivotRestPos = 0.52;
-        public double pivotCarryPos = 0.6;
+        public double pivotCarryPos = 0.23;
+        public double pivotDepositPos = 0.172;
+        public double pivotEjectSamplePos = 0.218;
+        public double pivotIntakePos = 0.1825;
+        public double pivotRestPos = 0.195;
 //        public double pivotHangPos = 0.2;
     }
     public static ServoValues SERVO_VALUES = new ServoValues();
@@ -216,7 +216,9 @@ public class Robot2TestIntake extends LinearOpMode {
 
             } // end intake state machine
 
-
+            if(gamepad2.dpad_up) {
+                intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
+            }
 
             // run slides for easier testing
             double slidePower = (-gamepad2.right_stick_y) * SLIDE_SPEED;

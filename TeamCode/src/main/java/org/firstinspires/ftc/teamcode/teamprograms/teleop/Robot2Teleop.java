@@ -100,11 +100,12 @@ public class Robot2Teleop extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.34; // 0.45
-        public double pivotEjectSamplePos = 0.5;
-        public double pivotDepositPos = 0.3;
-        public double pivotRestPos = 0.42;
-        public double pivotCarryPos = 0.6;
+        public double pivotCarryPos = 0.23;
+        public double pivotDepositPos = 0.172;
+        public double pivotEjectSamplePos = 0.218;
+        public double pivotIntakePos = 0.1825;
+        public double pivotRestPos = 0.195;
+        
         public double specimenGrabberOpenPos = 0.58; // adjust
         public double specimenGrabberClosePos = 0.47; // adjust
     }
@@ -188,7 +189,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double intakePos = 100;
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
-        public double hangOGPos = 2150;
+        public double hangOGPos = 2125;
         public double specimenGrabPos = 700; // adjust to right angle
         public double specimenPositionPos = 1200; // adjust to right angle
         public double specimenPlacePos = 1000; // adjust to right angle
@@ -268,7 +269,7 @@ public class Robot2Teleop extends LinearOpMode {
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
     boolean overridePID = false;
-    boolean camera = true; // disable if camera not in use or if it doesn't exist
+    boolean camera = false; // disable if camera not in use or if it doesn't exist
     boolean isRunningPivotToPosition = false;
     boolean specimanning = false;
 
@@ -1111,6 +1112,8 @@ public class Robot2Teleop extends LinearOpMode {
                         linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
+
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
 
 
                         lightTimer.reset();
