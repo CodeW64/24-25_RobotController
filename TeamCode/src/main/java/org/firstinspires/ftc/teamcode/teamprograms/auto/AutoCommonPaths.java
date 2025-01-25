@@ -17,6 +17,7 @@ import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.Rotation2d;
 import com.acmerobotics.roadrunner.ftc.Actions;
 import com.acmerobotics.roadrunner.TrajectoryActionBuilder;
+import com.acmerobotics.roadrunner.ProfileAccelConstraint;
 import com.acmerobotics.roadrunner.TranslationalVelConstraint;
 
 import org.firstinspires.ftc.robotcore.external.hardware.camera.BuiltinCameraDirection;
@@ -470,14 +471,14 @@ abstract public class AutoCommonPaths extends AprilLocater {
      * @param isBlue Whether the robot is on the blue side. This determines 
      *     which global coordinates to use.
      */
-    protected void moveRobotToNetZone(boolean isBlue, TranslationalVelConstraint cont) {
+    protected void moveRobotToNetZone(boolean isBlue, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         // Moving the robot forward based on the odometry
         final int TILE_SIZE = 24; // In inches
         Pose2d pose = pose = AutoCommonPaths.RED_NET;
         if(isBlue) {
             pose = AutoCommonPaths.BLUE_NET;
         }
-        lineTo(globalDrive, pose, cont);
+        lineTo(globalDrive, pose, cont, cont2);
     }
 
 
@@ -560,7 +561,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
 
-    protected void moveRobotToNetZoneCcw(boolean isBlue, Action action, TranslationalVelConstraint cont) {
+    protected void moveRobotToNetZoneCcw(boolean isBlue, Action action, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         // Moving the robot forward based on the odometry
         final int TILE_SIZE = 24; // In inches
         Pose2d pose = pose = AutoCommonPaths.RED_NET;
@@ -579,7 +580,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
                 .turnTo(Math.toRadians(-90))
                 .stopAndAdd(action)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading, cont)
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading, cont, cont2)
                 .build();
 
         } else {
@@ -587,7 +588,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
                 .turnTo(Math.toRadians(-90))
                 .stopAndAdd(action)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading, cont)
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading, cont, cont2)
                 .build();
 
         }
@@ -672,7 +673,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
      * @param drive The RR mecanum drivetrain to use as a basis. 
      * @param target The destination.
      */
-    protected void lineToSplineHeading(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont) {
+    protected void lineToSplineHeading(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
         final Pose2d offsetTarget = addPoses(target, destinationOffset);
@@ -701,7 +702,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
      * @param drive The RR mecanum drivetrain to use as a basis. 
      * @param target The destination.
      */
-    protected void lineToLinearHeading(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont) {
+    protected void lineToLinearHeading(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
         final Pose2d offsetTarget = addPoses(target, destinationOffset);
@@ -760,11 +761,11 @@ abstract public class AutoCommonPaths extends AprilLocater {
      * @param drive The RR mecanum drivetrain to use as a basis. 
      * @param target The destination.
      */
-    protected void lineTo(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont) {
+    protected void lineTo(MecanumDrive drive, Pose2d target, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         if(rotationType.equals(RotationType.LINEAR)) {
-            lineToLinearHeading(drive, target);
+            lineToLinearHeading(drive, target, cont, cont2);
         } else if(rotationType.equals(RotationType.SPLINE)) {
-            lineToSplineHeading(drive, target);
+            lineToSplineHeading(drive, target, cont, cont2);
         } else {
             throw new RuntimeException("Invalid rotationType attribute");
         }

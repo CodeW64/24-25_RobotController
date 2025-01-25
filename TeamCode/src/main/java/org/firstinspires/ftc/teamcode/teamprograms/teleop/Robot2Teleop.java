@@ -87,12 +87,12 @@ public class Robot2Teleop extends LinearOpMode {
     DcMotorEx frontRight, backRight, frontLeft, backLeft;
     DcMotorEx linearSlideRight, linearSlideLeft;
     DcMotorEx linearPivotRight, linearPivotLeft;
-    CRServo linearActuatorRight, linearActuatorLeft;
+    //// CRServo linearActuatorRight, linearActuatorLeft;
     CRServo intakeWheelR, intakeWheelL;
     Servo intakePivot;
     Servo specimenGrabber;
     CRServo duckSpinner;
-    DistanceSensor heightSensor;
+    // DistanceSensor heightSensor;
     IMU imu;
 
     ColorRangeSensor sampleSensor;
@@ -101,11 +101,11 @@ public class Robot2Teleop extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.44; // 0.45
-        public double pivotEjectSamplePos = 0.6;
-        public double pivotDepositPos = 0.4;
-        public double pivotRestPos = 0.52;
-        public double pivotCarryPos = 0.7;
+        public double pivotIntakePos = 0.34; // 0.45
+        public double pivotEjectSamplePos = 0.5;
+        public double pivotDepositPos = 0.3;
+        public double pivotRestPos = 0.42;
+        public double pivotCarryPos = 0.6;
         public double specimenGrabberOpenPos = 0.58; // adjust
         public double specimenGrabberClosePos = 0.47; // adjust
     }
@@ -158,7 +158,8 @@ public class Robot2Teleop extends LinearOpMode {
         //     (heightSensor.getDistance(unit) - STABILIZER_CONSTANTS.heightSensorOffsetY) 
         //     * Math.cos(theta)
         //     + STABILIZER_CONSTANTS.heightSensorOffsetX * Math.sin(theta);
-        return heightSensor.getDistance(DistanceUnit.INCH) - STABILIZER_CONSTANTS.heightSensorOffsetY;
+        // return heightSensor.getDistance(DistanceUnit.INCH) - STABILIZER_CONSTANTS.heightSensorOffsetY;
+        return 0;
     };
 
     // SLIDE VARIABLES (editable by FTC dashboard)
@@ -399,8 +400,8 @@ public class Robot2Teleop extends LinearOpMode {
             ascentStabilizer.r = STABILIZER_CONSTANTS.hookRadius;
 
             // FIXME: if things are broken, re-enable this
-//            linearActuatorRight.setPower(0);
-//            linearActuatorLeft.setPower(0);
+////            linearActuatorRight.setPower(0);
+////            linearActuatorLeft.setPower(0);
 
             // BUTTON CHECKS
             if (!gamepad2.right_bumper) checkGTwoRB = false;
@@ -1510,14 +1511,14 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // move hands for hanging
                     if (gamepad2.dpad_up) {
-                        linearActuatorRight.setPower(ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(ACTUATOR_SPEED);
                     } else if (gamepad2.dpad_down) {
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                     } else {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                     }
 
 
@@ -1749,12 +1750,12 @@ public class Robot2Teleop extends LinearOpMode {
                     }
     
                     if (gamepad2.dpad_down) {
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
                     } else {
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                     }
 
                     telemetry.addLine("----- Stabilize Robot -----");
@@ -1775,8 +1776,8 @@ public class Robot2Teleop extends LinearOpMode {
                         }
 
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
     
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
@@ -1797,8 +1798,8 @@ public class Robot2Teleop extends LinearOpMode {
                     if(gamepad2.dpad_right && !checkGTwoDRIGHT) {
 
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
 
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearSlideLeft.setPower(0);
@@ -1850,12 +1851,12 @@ public class Robot2Teleop extends LinearOpMode {
                     linearPivotTargetPosition = (int) radiansToPivotTicks(desiredArmTheta);
     
                     if (gamepad2.dpad_down) {
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
                     } else {
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                     }
 
                     telemetry.addLine("--- Automatic Hang Time (Alternate ~ Position) ---");
@@ -1873,8 +1874,8 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoDUP = true;
 
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
 
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearSlideLeft.setPower(0);
@@ -1896,8 +1897,8 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoDRIGHT = true;
 
                         // FIXME: not here originally
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
 
                         linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
                         linearSlideLeft.setPower(0);
@@ -2047,21 +2048,21 @@ public class Robot2Teleop extends LinearOpMode {
             // OLD
             /*if (gamepad2.dpad_left) {
                 // lower actuators manually to reset in case of malfunction
-                linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+               // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+               // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                 actuatorTimer.reset();
                 isActuatorInitialized = false;
 
             } else if (!isActuatorInitialized) {
 
                 // apply power to move actuators up for a set amount of time
-                linearActuatorRight.setPower(ACTUATOR_SPEED);
-                linearActuatorLeft.setPower(ACTUATOR_SPEED);
+               // linearActuatorRight.setPower(ACTUATOR_SPEED);
+               // linearActuatorLeft.setPower(ACTUATOR_SPEED);
 
                 // exit since it is guessed that the servos are at the right position for ascent
                 if (actuatorTimer.seconds() > 12.0) {
-                    linearActuatorRight.setPower(0);
-                    linearActuatorLeft.setPower(0);
+                   // linearActuatorRight.setPower(0);
+                   // linearActuatorLeft.setPower(0);
                     isActuatorInitialized = true;
                 }
             }*/
@@ -2076,23 +2077,23 @@ public class Robot2Teleop extends LinearOpMode {
                 // and whenever hands are reset
                 case HANDS_INITIALIZE:
                     if (!isActuatorStateInitialized) {
-                        linearActuatorRight.setPower(ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(ACTUATOR_SPEED);
                         storedActuatorTime = 0;
                         actuatorTimer.reset();
                         isRobot2ndLevelAscending = false;
                         isActuatorStateInitialized = true;
                     }
 
-                    linearActuatorRight.setPower(ACTUATOR_SPEED);
-                    linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                   // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                   // linearActuatorLeft.setPower(ACTUATOR_SPEED);
 
                     // EXIT
 
                     // go to rest
                     if (actuatorTimer.seconds() > TIME_CONSTANTS.handsInit) {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
                     }
@@ -2108,14 +2109,14 @@ public class Robot2Teleop extends LinearOpMode {
             // move hands up to ready to hang
                 case HANDS_UP:
                     if (!isActuatorStateInitialized) {
-                        linearActuatorRight.setPower(ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(ACTUATOR_SPEED);
                         actuatorTimer.reset();
                         isActuatorStateInitialized = true;
                     }
 
-                    linearActuatorRight.setPower(ACTUATOR_SPEED);
-                    linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                   // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                   // linearActuatorLeft.setPower(ACTUATOR_SPEED);
 
                     handTime = actuatorTimer.seconds() + storedActuatorTime;
 
@@ -2123,8 +2124,8 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // stop hands once they have presumably gone up far enough
                     if (handTime > TIME_CONSTANTS.handsUp) {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
                     }
@@ -2134,8 +2135,8 @@ public class Robot2Teleop extends LinearOpMode {
                     // go to hands down if canceled
                     /*if (gamepad1.dpad_up && !checkGOneDUP) {
                         checkGOneDUP = true;
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         storedActuatorTime = handTime;
                         isRobot2ndLevelAscending = false; // going down!
                         isActuatorStateInitialized = false;
@@ -2152,14 +2153,14 @@ public class Robot2Teleop extends LinearOpMode {
             // move hands down to hang
                 case HANDS_DOWN:
                     if (!isActuatorStateInitialized) {
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                         actuatorTimer.reset();
                         isActuatorStateInitialized = true;
                     }
 
-                    linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                    linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                   // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                   // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
 
                     handTime = actuatorTimer.seconds() + storedActuatorTime;
 
@@ -2167,8 +2168,8 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // stop hands once they have presumably gone down far enough
                     if (handTime > TIME_CONSTANTS.handsDown) {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_AT_REST;
                     }
@@ -2178,8 +2179,8 @@ public class Robot2Teleop extends LinearOpMode {
                     // go to hands up if canceled
                     /*if (gamepad1.dpad_up && !checkGOneDUP) {
                         checkGOneDUP = true;
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         storedActuatorTime = handTime;
                         isRobot2ndLevelAscending = false; // going up!
                         isActuatorStateInitialized = false;
@@ -2196,8 +2197,8 @@ public class Robot2Teleop extends LinearOpMode {
 
                 case HANDS_AT_REST:
                     if (!isActuatorStateInitialized) {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         storedActuatorTime = 0;
                         isActuatorStateInitialized = true;
                     }
@@ -2206,11 +2207,11 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // move down to adjust slightly if timers did not get it right
                     if (gamepad1.back) {
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                     } else {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                     }
 
                     // EXIT
@@ -2245,20 +2246,20 @@ public class Robot2Teleop extends LinearOpMode {
                 case HANDS_RESET:
                     if (!isActuatorStateInitialized) {
                         isRobot2ndLevelAscending = false;
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                         isActuatorStateInitialized = true;
                     }
 
-                    linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                    linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                   // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                   // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
 
                     // EXIT
                     // stop moving actuators down once button is let go
                     // (goes back to initialization stage)
                     if (!gamepad1.dpad_left) {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                         isActuatorStateInitialized = false;
                         actuatorHangState = ActuatorHangStates.HANDS_INITIALIZE;
                     }
@@ -2267,8 +2268,8 @@ public class Robot2Teleop extends LinearOpMode {
 
             
             // if(gamepad2.dpad_down) {
-            //     linearActuatorRight.setPower(-ACTUATOR_SPEED);
-            //     linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+            ////     linearActuatorRight.setPower(-ACTUATOR_SPEED);
+            ////     linearActuatorLeft.setPower(-ACTUATOR_SPEED);
             //     isActuatorStateInitialized = true;
             // }
 
@@ -2352,8 +2353,8 @@ public class Robot2Teleop extends LinearOpMode {
 
             telemetry.addLine("ACTUATORS");
             telemetry.addData("ACTUATOR STATE", actuatorHangState);
-            telemetry.addData("LAR POW", linearActuatorRight.getPower());
-            telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+            //// telemetry.addData("LAR POW", linearActuatorRight.getPower());
+            //// telemetry.addData("LAL POW", linearActuatorLeft.getPower());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("DRIVETRAIN");
@@ -2392,8 +2393,8 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("SENSORS");
-            telemetry.addData("Height Sensor Dist (in)", heightSensor.getDistance(DistanceUnit.INCH));
-            telemetry.addData("Height Sensor Getter (in)", heightGetter.getDistance(DistanceUnit.INCH));
+            // telemetry.addData("Height Sensor Dist (in)", heightSensor.getDistance(DistanceUnit.INCH));
+            // telemetry.addData("Height Sensor Getter (in)", heightGetter.getDistance(DistanceUnit.INCH));
             telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
             telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
             telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
@@ -2626,8 +2627,8 @@ public class Robot2Teleop extends LinearOpMode {
         linearPivotRight = hardwareMap.get(DcMotorEx.class, "linearPivotRight");
         linearPivotLeft = hardwareMap.get(DcMotorEx.class, "linearPivotLeft");
 
-        linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
-        linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
+        //// linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
+        //// linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
 
         intakeWheelR = hardwareMap.get(CRServo.class, "intakeWheelR");
         intakeWheelL = hardwareMap.get(CRServo.class, "intakeWheelL");
@@ -2641,7 +2642,7 @@ public class Robot2Teleop extends LinearOpMode {
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
 
         imu = hardwareMap.get(IMU.class, "imu");
-        heightSensor = hardwareMap.get(DistanceSensor.class, "heightSensor");
+        // heightSensor = hardwareMap.get(DistanceSensor.class, "heightSensor");
 
         // MOTOR/SERVO DIRECTIONS AND POSITION INITIALIZATION
         frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);

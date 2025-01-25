@@ -14,8 +14,8 @@ public class Robot2ResetHands extends LinearOpMode {
     @Override
     public void runOpMode() {
 
-        linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
-        linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
+        // linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
+        // linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
         intakePivot = hardwareMap.get(Servo.class, "intakePivot");
 
         intakePivot.setPosition(0.7);

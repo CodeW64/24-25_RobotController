@@ -78,18 +78,18 @@ import org.firstinspires.ftc.teamcode.RobotVision;
 @TeleOp(name = "AutoArmRunner2 Test Suite", group = "A")
 @Config
 public class AutoArmRunner2 extends LinearOpMode {
-    public boolean isTelemetrySuppresed = false;
+    public static boolean isTelemetrySuppresed = false;
 
     // HARDWARE
     protected DcMotorEx frontRight, backRight, frontLeft, backLeft;
     protected DcMotorEx linearSlideRight, linearSlideLeft;
     protected DcMotorEx linearPivotRight, linearPivotLeft;
-    protected CRServo linearActuatorRight, linearActuatorLeft;
+    //// protected CRServo linearActuatorRight, linearActuatorLeft;
     protected CRServo intakeWheelR, intakeWheelL;
     protected Servo intakePivot;
     protected Servo specimenGrabber;
     protected CRServo duckSpinner;
-    protected DistanceSensor heightSensor;
+    // protected DistanceSensor heightSensor;
     protected IMU imu;
 
     protected ColorRangeSensor sampleSensor;
@@ -98,12 +98,12 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotIntakePos = 0.40;
-        public double pivotHoverPos = 0.48;
-        public double pivotEjectSamplePos = 0.6;
-        public double pivotDepositPos = 0.4;
-        public double pivotRestPos = 0.52;
-        public double pivotCarryPos = 0.6;
+        public double pivotIntakePos = 0.30;
+        public double pivotHoverPos = 0.38;
+        public double pivotEjectSamplePos = 0.5;
+        public double pivotDepositPos = 0.3;
+        public double pivotRestPos = 0.42;
+        public double pivotCarryPos = 0.5;
         public double specimenGrabberOpenPos = 0.58; // adjust
         public double specimenGrabberClosePos = 0.47; // adjust
     }
@@ -153,7 +153,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     // PIVOT VARIABLES (editable by FTC dashboard)
     public static class PivotConstants {
         public double cushionRatio = 400;
-        public double kp = 0.005;
+        public double kp = 0.0038;
         public double ki = 0.0;
         public double kd = 0.0; // 0.0002
         public double gravityFeedForward = 0.002;
@@ -175,7 +175,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     public final static double PIVOT_TICKS_PER_DEGREE = 2000.0 / 90.0; // (motor PPR / gear ratio) / 360
     public final static double PIVOT_TICKS_PER_RAD = PIVOT_TICKS_PER_DEGREE * 180 / Math.PI;
 
-    public final double LIFT_TICKS_PER_INCH_EXTENDED = 384.5 / 537.7 * 3450.0 / 30.0;
+    public final static double LIFT_TICKS_PER_INCH_EXTENDED = 384.5 / 537.7 * 3450.0 / 30.0;
 
     private PIDController pivotController;
 
@@ -346,8 +346,8 @@ public class AutoArmRunner2 extends LinearOpMode {
         // RUN LOOP -----------------------------------------------------------------------------
 
         while (opModeIsActive()) {
-            linearActuatorRight.setPower(0);
-            linearActuatorLeft.setPower(0);
+           // linearActuatorRight.setPower(0);
+           // linearActuatorLeft.setPower(0);
 
             currentSampleDistance = sampleSensor.getDistance(DistanceUnit.CM);
 
@@ -1267,14 +1267,14 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                     // move hands for hanging
                     if (gamepad2.dpad_up) {
-                        linearActuatorRight.setPower(ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(ACTUATOR_SPEED);
                     } else if (gamepad2.dpad_down) {
-                        linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                        linearActuatorLeft.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorRight.setPower(-ACTUATOR_SPEED);
+                       // linearActuatorLeft.setPower(-ACTUATOR_SPEED);
                     } else {
-                        linearActuatorRight.setPower(0);
-                        linearActuatorLeft.setPower(0);
+                       // linearActuatorRight.setPower(0);
+                       // linearActuatorLeft.setPower(0);
                     }
 
 
@@ -1394,20 +1394,8 @@ public class AutoArmRunner2 extends LinearOpMode {
             // get the hands to the relative correct position for hanging
             // there is a safety to lower in case things go wrong (default case)
             
-            linearActuatorRight.setPower(0);
-            linearActuatorLeft.setPower(0);
-            
-            if (gamepad2.dpad_left) {
-                // lower actuators manually to reset in case of malfunction
-                linearActuatorRight.setPower(-ACTUATOR_SPEED);
-                linearActuatorLeft.setPower(-ACTUATOR_SPEED);
-                isActuatorInitialized = true;
-            } else if (!isActuatorInitialized && setupTimer.seconds() <= 5.0) {
-
-                // apply power to move actuators up for a set amount of time
-                linearActuatorRight.setPower(ACTUATOR_SPEED);
-                linearActuatorLeft.setPower(ACTUATOR_SPEED);
-            }
+           // linearActuatorRight.setPower(0);
+           // linearActuatorLeft.setPower(0);
 
 // TELEMETRY ------------------------------------------------------------------------------------
             if(!isTelemetrySuppresed) { 
@@ -1420,8 +1408,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                 telemetry.addLine("-------------------------");
 
                 telemetry.addLine("ACTUATORS");
-                telemetry.addData("LAR POW", linearActuatorRight.getPower());
-                telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+                //telemetry.addData("LAR POW", linearActuatorRight.getPower());
+                //telemetry.addData("LAL POW", linearActuatorLeft.getPower());
                 telemetry.addLine("-------------------------");
 
                 telemetry.addLine("DRIVETRAIN");
@@ -1623,8 +1611,8 @@ public class AutoArmRunner2 extends LinearOpMode {
         linearPivotRight = hardwareMap.get(DcMotorEx.class, "linearPivotRight");
         linearPivotLeft = hardwareMap.get(DcMotorEx.class, "linearPivotLeft");
 
-        linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
-        linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
+        //// linearActuatorRight = hardwareMap.get(CRServo.class, "linearActuatorRight");
+        //// linearActuatorLeft = hardwareMap.get(CRServo.class, "linearActuatorLeft");
 
         intakeWheelR = hardwareMap.get(CRServo.class, "intakeWheelR");
         intakeWheelL = hardwareMap.get(CRServo.class, "intakeWheelL");
@@ -1638,7 +1626,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
 
         imu = hardwareMap.get(IMU.class, "imu");
-        heightSensor = hardwareMap.get(DistanceSensor.class, "heightSensor");
+        // heightSensor = hardwareMap.get(DistanceSensor.class, "heightSensor");
 
         // MOTOR/SERVO DIRECTIONS AND POSITION INITIALIZATION
         frontLeft.setDirection(DcMotorSimple.Direction.REVERSE);

@@ -56,6 +56,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private int neutralTagId = AprilLocater.NEUTRAL_BLUE_ID;
     private int coloredTagId = AprilLocater.COLORED_BLUE_ID;
     private boolean repositionEnabled = false;
+    public static boolean isDebugMode = false;
     // DEV: This line is true to do testing; please make it false by thurs
     private boolean isTeleopMode = false; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
 
@@ -1229,62 +1230,64 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         telemetry.setMsTransmissionInterval(33);
         lift.print();
 
-        telemetry.addLine("");
-        telemetry.addLine("");
-        telemetry.addLine("");
-        telemetry.addData("Current State", linearSlideState.name());
-        telemetry.addLine("");
+        if(isDebugMode) {
+            telemetry.addLine("");
+            telemetry.addLine("");
+            telemetry.addLine("");
+            telemetry.addData("Current State", linearSlideState.name());
+            telemetry.addLine("");
 
-        telemetry.addLine("ACTUATORS");
-        telemetry.addData("LAR POW", linearActuatorRight.getPower());
-        telemetry.addData("LAL POW", linearActuatorLeft.getPower());
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("ACTUATORS");
+            // telemetry.addData("LAR POW", linearActuatorRight.getPower());
+            // telemetry.addData("LAL POW", linearActuatorLeft.getPower());
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("DRIVETRAIN");
-        telemetry.addData("Front R POW", frontRight.getPower());
-        telemetry.addData("Back R POW", backLeft.getPower());
-        telemetry.addData("Front R POW", frontRight.getPower());
-        telemetry.addData("Back L POW", backLeft.getPower());
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("DRIVETRAIN");
+            telemetry.addData("Front R POW", frontRight.getPower());
+            telemetry.addData("Back R POW", backLeft.getPower());
+            telemetry.addData("Front R POW", frontRight.getPower());
+            telemetry.addData("Back L POW", backLeft.getPower());
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("LIFT SLIDES");
-        telemetry.addData("Slide R POW", linearSlideRight.getPower());
-        telemetry.addData("Slide L POW", linearSlideLeft.getPower());
-        telemetry.addData("Slide R POS", linearSlideRight.getCurrentPosition());
-        telemetry.addData("Slide L POS", linearSlideLeft.getCurrentPosition());
-        telemetry.addData("Slide AVG POS", getLinearSlideAvgPosition());
-        // telemetry.addData("Slide AVG Extension (in)", liftTicksToInches(linearSlideAvgPosition));
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("LIFT SLIDES");
+            telemetry.addData("Slide R POW", linearSlideRight.getPower());
+            telemetry.addData("Slide L POW", linearSlideLeft.getPower());
+            telemetry.addData("Slide R POS", linearSlideRight.getCurrentPosition());
+            telemetry.addData("Slide L POS", linearSlideLeft.getCurrentPosition());
+            telemetry.addData("Slide AVG POS", getLinearSlideAvgPosition());
+            // telemetry.addData("Slide AVG Extension (in)", liftTicksToInches(linearSlideAvgPosition));
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("LIFT PIVOTS");
-        telemetry.addData("Pivot R POW", linearPivotRight.getPower());
-        telemetry.addData("Pivot L POW", linearPivotLeft.getPower());
-        telemetry.addData("Pivot R POS", linearPivotRight.getCurrentPosition());
-        telemetry.addData("Pivot L POS", linearPivotLeft.getCurrentPosition());
-        telemetry.addData("Pivot AVG POS", getLinearPivotAvgPosition());
-        // telemetry.addData("Pivot AVG Extension (deg)", 360 / (2 * Math.PI) * pivotTicksToRadians(linearPivotAvgPosition));
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("LIFT PIVOTS");
+            telemetry.addData("Pivot R POW", linearPivotRight.getPower());
+            telemetry.addData("Pivot L POW", linearPivotLeft.getPower());
+            telemetry.addData("Pivot R POS", linearPivotRight.getCurrentPosition());
+            telemetry.addData("Pivot L POS", linearPivotLeft.getCurrentPosition());
+            telemetry.addData("Pivot AVG POS", getLinearPivotAvgPosition());
+            // telemetry.addData("Pivot AVG Extension (deg)", 360 / (2 * Math.PI) * pivotTicksToRadians(linearPivotAvgPosition));
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("SERVOS");
-        telemetry.addData("Intake WR POW", intakeWheelR.getPower());
-        telemetry.addData("Intake WL POW", intakeWheelL.getPower());
-        telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
-        telemetry.addData("Specimen POS", specimenGrabber.getPosition());
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("SERVOS");
+            telemetry.addData("Intake WR POW", intakeWheelR.getPower());
+            telemetry.addData("Intake WL POW", intakeWheelL.getPower());
+            telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
+            telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("SENSORS");
-        telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
-        telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
-        telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
-        telemetry.addLine("(operating range 1-10 centimeters)");
-        telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
-        telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
-        telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("SENSORS");
+            telemetry.addData("Limit Switch Activated", linearSlideSwitch.isPressed());
+            telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
+            telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
+            telemetry.addLine("(operating range 1-10 centimeters)");
+            telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
+            telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
+            telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
+            telemetry.addLine("-------------------------");
 
-        telemetry.addLine("LOGIC");
-        telemetry.addData("Specimanning", specimanning);
-        telemetry.addLine("-------------------------");
+            telemetry.addLine("LOGIC");
+            telemetry.addData("Specimanning", specimanning);
+            telemetry.addLine("-------------------------");
+        }
     }
 
     @Override
