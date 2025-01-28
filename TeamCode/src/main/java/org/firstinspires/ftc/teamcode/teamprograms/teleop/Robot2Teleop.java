@@ -625,7 +625,8 @@ public class Robot2Teleop extends LinearOpMode {
                             linearSlideState = LinearSlideStates.INTAKE_FULL;
                         } else {
                             // robot did not get sample
-                            linearSlideState = LinearSlideStates.INTAKE_EMPTY;
+                            // FIXME: change back to intake empty if not work
+                            linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
                         }
                     } else if (lightTimer.seconds() > 0.6) {
                         // bring intake up for a short period to secure sample
@@ -1502,12 +1503,11 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // EXIT
 
-                    // make deposit accessible once lift has finished pivoting
-                    // (and once slide has finished retracting)
-                    // NOTE: pivot finishes in deposit mode
+                    // make hang OG accessible eventually
+                    // NOTE: pivot finishes in hang OG
                     if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.hangOGPos) < 300) {
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.DEPOSIT_ACTIVE;
+                        linearSlideState = LinearSlideStates.HANG_TIME_OG;
                     }
 
                     // ABORT
