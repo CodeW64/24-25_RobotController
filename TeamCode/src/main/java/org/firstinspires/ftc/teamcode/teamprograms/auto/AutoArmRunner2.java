@@ -87,7 +87,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     //// protected CRServo linearActuatorRight, linearActuatorLeft;
     protected CRServo intakeWheelR, intakeWheelL;
     protected Servo intakePivot;
-    protected Servo specimenGrabber;
+    protected Servo specimenGrabberL, specimenGrabberR;
     protected CRServo duckSpinner;
     // protected DistanceSensor heightSensor;
     protected IMU imu;
@@ -104,8 +104,11 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double pivotIntakePos = 0.1825;
         public double pivotHoverPos = 0.195;
         public double pivotRestPos = 0.195;
-        public double specimenGrabberOpenPos = 0.58; // adjust
-        public double specimenGrabberClosePos = 0.47; // adjust
+        
+        public double specimenGrabberLOpenPos = 0.58; // adjust
+        public double specimenGrabberROpenPos = 0.58; // adjust
+        public double specimenGrabberLClosePos = 0.47; // adjust
+        public double specimenGrabberRClosePos = 0.47; // adjust
     }
     public static ServoValues SERVO_VALUES = new ServoValues();
 
@@ -1032,7 +1035,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
 
-                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = true;
                     }
@@ -1045,11 +1049,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberROpenPos);
                             isGrabberOpen = true;
                         }
                     }
@@ -1060,7 +1066,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                     // pivot to positioning specimen hang once successful grab off wall
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
-                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = false;
 //                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
@@ -1135,11 +1142,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberROpenPos);
                             isGrabberOpen = true;
                         }
                     }
@@ -1448,7 +1457,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                 telemetry.addData("Intake WR POW", intakeWheelR.getPower());
                 telemetry.addData("Intake WL POW", intakeWheelL.getPower());
                 telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
-                telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+                telemetry.addData("Specimen L POS", specimenGrabberL.getPosition());
+                telemetry.addData("Specimen R POS", specimenGrabberR.getPosition());
                 telemetry.addLine("-------------------------");
 
                 telemetry.addLine("SENSORS");
@@ -1625,7 +1635,8 @@ public class AutoArmRunner2 extends LinearOpMode {
 
         duckSpinner = hardwareMap.get(CRServo.class, "duckSpinner");
 
-        specimenGrabber = hardwareMap.get(Servo.class, "specimenGrabber");
+        specimenGrabberL = hardwareMap.get(Servo.class, "specimenGrabberL");
+        specimenGrabberR = hardwareMap.get(Servo.class, "specimenGrabberR");
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
