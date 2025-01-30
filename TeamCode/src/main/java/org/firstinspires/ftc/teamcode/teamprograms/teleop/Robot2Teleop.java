@@ -89,7 +89,7 @@ public class Robot2Teleop extends LinearOpMode {
 //    CRServo linearActuatorRight, linearActuatorLeft;
     CRServo intakeWheelR, intakeWheelL;
     Servo intakePivot;
-    Servo specimenGrabber;
+    Servo specimenGrabberR, specimenGrabberL;
     CRServo duckSpinner;
 
 //    DistanceSensor heightSensor;
@@ -269,7 +269,7 @@ public class Robot2Teleop extends LinearOpMode {
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
     boolean overridePID = false;
-    boolean camera = false; // disable if camera not in use or if it doesn't exist
+    boolean camera = true; // disable if camera not in use or if it doesn't exist
     boolean isRunningPivotToPosition = false;
     boolean specimanning = false;
 
@@ -1285,7 +1285,8 @@ public class Robot2Teleop extends LinearOpMode {
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
 
-                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = true;
                     }
@@ -1303,11 +1304,13 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                             isGrabberOpen = true;
                         }
                     }
@@ -1320,7 +1323,8 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoLT = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
-                        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = false;
 //                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
@@ -1404,11 +1408,13 @@ public class Robot2Teleop extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                             isGrabberOpen = true;
                         }
                     }
@@ -2460,7 +2466,8 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Intake WR POW", intakeWheelR.getPower());
             telemetry.addData("Intake WL POW", intakeWheelL.getPower());
             telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
-            telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+            telemetry.addData("Specimen R POS", specimenGrabberR.getPosition());
+            telemetry.addData("Specimen L POS", specimenGrabberL.getPosition());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("SENSORS");
@@ -2711,7 +2718,8 @@ public class Robot2Teleop extends LinearOpMode {
 
         duckSpinner = hardwareMap.get(CRServo.class, "duckSpinner");
 
-        specimenGrabber = hardwareMap.get(Servo.class, "specimenGrabber");
+        specimenGrabberR = hardwareMap.get(Servo.class, "specimenGrabberR");
+        specimenGrabberL = hardwareMap.get(Servo.class, "specimenGrabberL");
 
         sampleSensor = hardwareMap.get(ColorRangeSensor.class, "sampleSensor");
         linearSlideSwitch = hardwareMap.get(TouchSensor.class, "linearSlideSwitch");
@@ -2742,6 +2750,7 @@ public class Robot2Teleop extends LinearOpMode {
         sampleSensor.setGain(SENSOR_VARIABLES.sampleSensorGain);
 
         intakeWheelR.setDirection(DcMotorSimple.Direction.REVERSE);
+        specimenGrabberR.setDirection(Servo.Direction.REVERSE);
 
         // normally enabled
         if (camera) {

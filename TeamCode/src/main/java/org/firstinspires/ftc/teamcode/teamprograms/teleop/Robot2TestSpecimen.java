@@ -1,12 +1,20 @@
 package org.firstinspires.ftc.teamcode.teamprograms.teleop;
 
 import com.acmerobotics.dashboard.config.Config;
+import com.qualcomm.robotcore.eventloop.opmode.Disabled;
 import com.qualcomm.robotcore.eventloop.opmode.LinearOpMode;
 import com.qualcomm.robotcore.eventloop.opmode.TeleOp;
 import com.qualcomm.robotcore.hardware.PwmControl;
 import com.qualcomm.robotcore.hardware.ServoImplEx;
 
+/**
+ * program was for use with the HITEC HSRM9382TH Servo
+ **/
+
+
 @TeleOp(group = "AAA")
+@Deprecated
+@Disabled
 @Config
 public class Robot2TestSpecimen extends LinearOpMode {
 
