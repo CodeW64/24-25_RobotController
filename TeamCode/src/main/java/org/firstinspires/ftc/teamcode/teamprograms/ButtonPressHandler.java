@@ -91,7 +91,7 @@ public class ButtonPressHandler {
         }
 
         // The button is has been let go; set hasActivated to false
-        if(!hasActivatedFunction) {
+        if(!isButtonHeld && hasActivatedFunction) {
             hasActivatedFunction = false;
         }
 
@@ -117,7 +117,7 @@ public class ButtonPressHandler {
         }
 
         // The button is has been let go; set hasActivated to false
-        if(!hasActivatedFunction) {
+        if(!isButtonHeld && hasActivatedFunction) {
             hasActivatedFunction = false;
         }
 
