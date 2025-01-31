@@ -1271,7 +1271,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             telemetry.addData("Intake WR POW", intakeWheelR.getPower());
             telemetry.addData("Intake WL POW", intakeWheelL.getPower());
             telemetry.addData("Intake PIVOT POS", intakePivot.getPosition());
-            telemetry.addData("Specimen POS", specimenGrabber.getPosition());
+            telemetry.addData("Specimen L POS", specimenGrabberL.getPosition());
+            telemetry.addData("Specimen R POS", specimenGrabberR.getPosition());
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("SENSORS");
