@@ -1393,9 +1393,13 @@ public class AutoArmRunner2 extends LinearOpMode {
 
             // run position power controller for pivot
             if (isRunningPivotToPosition) {
-                runPivotToPositionIndividual(
-                        linearPivotRight.getCurrentPosition(),
-                        linearPivotLeft.getCurrentPosition(),
+                // runPivotToPositionIndividual(
+                //         linearPivotRight.getCurrentPosition(),
+                //         linearPivotLeft.getCurrentPosition(),
+                //         linearPivotTargetPosition,
+                //         pivotPIDSpeedMultiplier);
+                runPivotToPosition(
+                        (int) linearPivotAvgPosition,
                         linearPivotTargetPosition,
                         pivotPIDSpeedMultiplier);
             } else if (!overridePID) {
@@ -1564,6 +1568,7 @@ public class AutoArmRunner2 extends LinearOpMode {
      * @param currentPositionL current position of left pivot motor
      * @param targetPosition desired end position for lift pivot
      **/
+    @Deprecated
     private void runPivotToPositionIndividual(int currentPositionR, int currentPositionL, int targetPosition, double speedMultiplier) {
         // update PID variables every loop
         pivotController.setPID(PIVOT_CONSTANTS.kp, PIVOT_CONSTANTS.ki, PIVOT_CONSTANTS.kd);
@@ -1598,6 +1603,42 @@ public class AutoArmRunner2 extends LinearOpMode {
         linearPivotRight.setPower(pivotPowerR);
         linearPivotLeft.setPower(pivotPowerL);
     }
+
+    /**
+     * Runs and sets pivot motor powers based on a target position while fighting gravity. <br>
+     * <strong>This should be used in place of RUN_TO_POSITION for the chain driven pivots!</strong> <br>
+     * (note when not in use, powers should manually be set to 0 to avoid residual motor power.)
+     * @param currentPosition current position of right pivot motor
+     * @param targetPosition desired end position for lift pivot
+     **/
+    private void runPivotToPosition(int currentPosition, int targetPosition, double speedMultiplier) {
+        // update PID variables every loop
+        pivotController.setPID(PIVOT_CONSTANTS.kp, PIVOT_CONSTANTS.ki, PIVOT_CONSTANTS.kd);
+
+        // calculate power to apply to pivots
+        double pivotPID = pivotController.calculate(currentPosition, targetPosition);
+        pivotPID = Range.clip(pivotPID, -1.0, 1.0);
+
+        // find feedforward to fight gravity based on arm being completely horizontal when starting
+        double pivotFF = Math.cos(Math.toRadians(currentPosition / PIVOT_TICKS_PER_DEGREE + 1)) * PIVOT_CONSTANTS.gravityFeedForward;
+
+        // perhaps a more useful calculation if position is wanted to be found when arm is vertically down
+//            ff = Math.sin(Math.toRadians(armPos / ticks_in_degree + zeroOffset )) * f;
+
+//        double pivotPower = (pivotPID * PIVOT_CONSTANTS.speedCap) + pivotFF;
+
+        // modify raw PID power so robot does not rattle apart since kd was not very effective
+        double accelerationFactor = Range.clip((pidTimer.seconds()*10), 0, 1.0);
+        double acceleratedPower = Math.min(accelerationFactor*pivotPID, PIVOT_SPEED);
+        double pivotPower = acceleratedPower + pivotFF;
+
+        pivotPower*=speedMultiplier;
+
+        // apply power to pivot motors
+        linearPivotRight.setPower(pivotPower);
+        linearPivotLeft.setPower(pivotPower);
+    }
+
 
     public double getLinearPivotAvgPosition() {
         return (linearPivotLeft.getCurrentPosition() + linearPivotRight.getCurrentPosition()) * 0.5;
