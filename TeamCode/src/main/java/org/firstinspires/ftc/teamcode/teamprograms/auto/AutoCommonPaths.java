@@ -595,6 +595,16 @@ abstract public class AutoCommonPaths extends AprilLocater {
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
 
+    protected void moveRobotToNetSafety(boolean isBlue, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
+        // Moving the robot forward based on the odometry
+        final int TILE_SIZE = 24; // In inches
+        Pose2d pose = pose = AutoCommonPaths.RED_NET;
+        if(isBlue) {
+            pose = AutoCommonPaths.BLUE_NET;
+        }
+        lineTo(globalDrive, pose.position, cont, cont2);
+    }
+
     /**
      * Moves the robot to the net zone based soley on odometry. This is done 
      * relative to the start point, so no distinction is made between red or 
@@ -682,13 +692,13 @@ abstract public class AutoCommonPaths extends AprilLocater {
         if(deltaPosition.x == 0) {
             moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading, cont)
+                .lineToYSplineHeading(offsetTarget.position.y, offsetTarget.heading, cont, cont2)
                 .build();
 
         } else {
             moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading, cont)
+                .lineToXSplineHeading(offsetTarget.position.x, offsetTarget.heading, cont, cont2)
                 .build();
 
         }
@@ -711,13 +721,13 @@ abstract public class AutoCommonPaths extends AprilLocater {
         if(deltaPosition.x == 0) {
             moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToYLinearHeading(offsetTarget.position.y, offsetTarget.heading, cont)
+                .lineToYLinearHeading(offsetTarget.position.y, offsetTarget.heading, cont, cont2)
                 .build();
 
         } else {
             moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
-                .lineToXLinearHeading(offsetTarget.position.x, offsetTarget.heading, cont)
+                .lineToXLinearHeading(offsetTarget.position.x, offsetTarget.heading, cont, cont2)
                 .build();
 
         }
@@ -747,6 +757,35 @@ abstract public class AutoCommonPaths extends AprilLocater {
             moveToTarget = drive.actionBuilder(currentPos)
                 .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
                 .lineToX(offsetTarget.x)
+                .build();
+
+        }
+        Actions.runBlocking(moveToTarget); // Pray 🤞
+    }
+
+    /**
+     * Uses RR to move in a line to the given point. The heading remainins the 
+     * same after moving.
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     */
+    protected void lineTo(MecanumDrive drive, Vector2d target, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Vector2d offsetTarget = target;
+        final Vector2d deltaPosition = offsetTarget.minus(currentPos.position);
+        Action moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToY(offsetTarget.y, cont, cont2)
+                .build();
+
+        } else {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToX(offsetTarget.x, cont, cont2)
                 .build();
 
         }

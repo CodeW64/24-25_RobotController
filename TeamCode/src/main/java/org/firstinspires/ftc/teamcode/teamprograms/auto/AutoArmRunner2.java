@@ -214,7 +214,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     final double ACTUATOR_SPEED = 1.0;
 
     boolean tankDrive = true;
-    boolean disableDuck = false;
+    boolean disableDuck = true;
     boolean runningToBucketAprilTag = false;
     boolean overridePID = false;
     boolean camera = false; // disable if camera not in use or if it doesn't exist
