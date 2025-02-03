@@ -614,6 +614,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     private double distBack = DIST_BACK;
     private double distStrafe = DIST_STRAFE;
     private Pose2d backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0);
+    private ElapsedTime autoRuntime = new ElapsedTime();
 
     @Override
     public void opMode_init() {
@@ -893,7 +894,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @return Whether or not the sample was obtained. 
      * @throws InterruptedException
      */
-    private boolean grabSampleSync(boolean retry, int offset) throws InterruptedException {
+    private boolean grabSampleSequence(boolean retry, int offset) throws InterruptedException {
         telemetry.addLine("Extending to sample...");
         telemetry.update();
         lift.waitForFinish(); // Wait for the arm to finish retraction
@@ -908,7 +909,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             (
                 !isPossessingSample(currentSampleDistance) 
                 && lightTimer.seconds() <= 4.0 
-                // && 30 - getRuntime() >= 5 // FIXME: Make this acutally representative of time left
+                && getSecondsRemaining() >= 5
             )
             && opModeIsActive()
         ) {
@@ -926,7 +927,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
                     && lightTimer.seconds() <= 2.0 
-                    // && 30 - lightTimer.seconds() >= 4.5 // FIXME: Make this actually representative of rime left
+                    && getSecondsRemaining() >= 4.5
                     && !isPossessingSample(currentSampleDistance)
                 )
                 && opModeIsActive()
@@ -935,9 +936,9 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             }
 
             // Exiting the retry loop if we don't want to retry
-            // if(!retry) {
-            //     break retryLoop; 
-            // }
+            if(!retry) {
+                break retryLoop; 
+            }
 
             if(isPossessingSample(currentSampleDistance)) {
                 break retryLoop;
@@ -951,6 +952,19 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         }
 
         return isPossessingSample(currentSampleDistance);
+    }
+
+    /**
+     * Returns the number of seconds remaining in the auto opmode. This is since 
+     * the press of the play button, NOT the init button. 
+     * 
+     * <p> If the auto timer is disabled (i.e. what stops the opmode after 30s),
+     * this is able to go into the negatives 
+     * 
+     * @return What sure what else to say ¯\_(ツ)_/¯
+     */
+    private double getSecondsRemaining() {
+        return 30 - autoRuntime.seconds();
     }
 
     /**
@@ -1146,6 +1160,8 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // DEV END
 
         // Starting the actual stuffs
+        autoRuntime.startTime();
+        autoRuntime.reset();
         lift.start();
         SLIDE_CONSTANTS.intakeEndRetract = 2147000;
         SLIDE_CONSTANTS.depositEndRetract = extendToSampleExtension;
@@ -1188,34 +1204,28 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             }
             
             // Moving to grab the sample
+            extendAsync();
+
             setDestinationOffset(finalOffset); // Puts the robot into grabbing position
             globalDrive.updatePoseEstimate();
             setRotationType(RotationType.SPLINE);
-
-            // if(isFirstSpikeSample) {
-                extendAsync();
-            // }
-
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
 
             // Grabbing the sample
             resetDestinationOffset();
-            grabSampleSync(false, 0); // Grab the pixel. and retract
+            grabSampleSequence(true, 0); // Grab the pixel. and retract
 
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
 
-            // if(30 - getRuntime() <= 4.0) {
-            //     if(30 - getRuntime() >= 1.0) {
-            //         goToAscent = true;
-            //     }
-            //     break grabDepositLoop;
-            // }
+            if(getSecondsRemaining() <= 3.0) {
+                break grabDepositLoop;
+            }
 
+            // Retracting to make sure the pivot can lift the arm
             retractSync();
-
-            // Waiting for the arm to go up and out of the way
+            
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
@@ -1349,7 +1359,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         
         if(gamepad1.left_trigger > 0.1 && !left_trigger) {extendToBucketsSync(); left_trigger = true;}
         
-        if(gamepad1.right_trigger > 0.1 && !right_trigger) {grabSampleSync(true, 0); right_trigger = false;} //
+        if(gamepad1.right_trigger > 0.1 && !right_trigger) {grabSampleSequence(true, 0); right_trigger = false;} //
         
         if(gamepad1.left_bumper && !left_bumper) {berriddenOfSample(); left_bumper = true;} // Worked, I guess?
         
