@@ -961,7 +961,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * <p> With the exception of an ending arm switch down, this method is 
      * synchronous. 
      */
-    private void initialScoreSequence(boolean arg) throws InterruptedException {
+    private void initialScoreSequence(/*DEV arg*/boolean arg) throws InterruptedException {
         // Getting the arm up and extended (at least partially) first, and the robot in a safe pos
         globalDrive.updatePoseEstimate();
         switchArmAsync(); // Get the arm up
@@ -1057,17 +1057,45 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         berriddenOfSample(); // Aaaaand deposit, then come back!
     }
 
-    // /**
-    //  * Performs all necessary actions to take a grabbed sample to the basket. 
-    //  * This includes moving to the basket, extending the arm, depositing, and a 
-    //  * final retract.
-    //  * 
-    //  * <p> With the exception of an ending arm switch down, this method is 
-    //  * synchronous. 
-    //  */
-    // private void scoreSequence() throws InterruptedException {
+    /**
+     * Performs all necessary actions to take a grabbed sample to the basket. 
+     * This includes moving to the basket, extending the arm, depositing, and a 
+     * final retract.
+     * 
+     * <p> With the exception of an ending arm switch down, this method is 
+     * synchronous. 
+     */
+    private void scoreSequence(int i) throws InterruptedException {
+        // Getting the arm up and extended (at least partially) first, and the robot in a safe pos
+        globalDrive.updatePoseEstimate();
+        switchArmAsync(); // Get the arm up
+        lift.waitForSwitchStart();
 
-    // }
+        queExtendToBucketsAsync(PIVOT_SAFE_FOR_EXTENSION);
+
+        distBack = DIST_BACK_LATER - DIST_INCREMENT * (2 - i);
+        distStrafe = DIST_STRAFE_LATER;
+        backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
+        MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+        setDestinationOffset(backAway); // Move back to avoid accidental hanging
+        moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        resetDestinationOffset();
+        MecanumDrive.PARAMS.positionTolerance = 1.0;
+
+        // Moving to the basket and scoring when the arm is sufficiently up
+        lift.waitForSwitch();
+
+        MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+        setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
+        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        resetDestinationOffset();
+        MecanumDrive.PARAMS.positionTolerance = 1.0;
+
+        // Waiting for the arm to be sufficiently extended before depositing
+        // Arm is told to lift when teh arm is told to switch up (before the safety move)
+        lift.waitForFinish();
+        berriddenOfSample(); // Aaaaand deposit, then come back!
+    }
 
     /**
      * Logs out the name of the section to time. The timer returned can be 
@@ -1192,31 +1220,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 continue grabDepositLoop;
             }
 
-            switchArmAsync(); // Switch the arm up
-            
-            // Moving to score
-            distBack = DIST_BACK_LATER - DIST_INCREMENT * (2 - i);
-            distStrafe = DIST_STRAFE_LATER;
-            backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
-            setDestinationOffset(backAway); // Move back to avoid accidental hanging
-            
-            MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
-            globalDrive.updatePoseEstimate();
-            moveRobotToNetZoneCcw(isBlue, new Action() {
-                @Override
-                public boolean run(TelemetryPacket p) {
-                    if(lift.hasFinishedPivot()) {
-                        extendToBucketsAsync(); // Extend to the buckets once we have done our signature turn.
-                        return false;
-                    }
-                    return true;
-                } 
-            }, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-30, 30));
-            MecanumDrive.PARAMS.positionTolerance = 1.0;    
-            
-            resetDestinationOffset();
-            lift.waitForFinish();
-            berriddenOfSample();
+            scoreSequence(i);
             isFirstSpikeSample = false;
         }
 
