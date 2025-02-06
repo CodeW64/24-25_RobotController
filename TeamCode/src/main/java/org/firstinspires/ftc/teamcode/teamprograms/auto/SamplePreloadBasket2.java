@@ -98,15 +98,25 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     );
 
     private double sampleSensingDistance;
+
+    public static double MAX_NET_VEL = 30;
+    public static double MIN_NET_ACCEL = -40;
+    public static double MAX_NET_ACCEL = 30;
     
+    public static long DEPOSIT_EJECT_MS = 200l;
     public static double SECONDS_CLOSE_TIMEOUT = 0.5;
-    public static double GRAB_SAMPLE_SYNC_MAX_SECONDS = 3.3;
-    public static double ONE_RETRY_MAX_SECONDS = 1.1;
+    public static double GRAB_MIN_REMAINING_SEC = 4.0;
+    public static double GRAB_SYNC_MAX_SEC = 5.0;
+    public static double GRAB_RETRY_SEC = 1.5;
+    public static double MIN_REAMINING_SCORE_SEC = 3.0;
 
     public static int CHAMBER_EXTENSION = 2500;
     public static int EXTEND_TO_SAMPLE_EXTENSION = 1150;
     public static int EXTEND_TO_SAMPLE_LAST_EXTENSION = 1300;
     public static int FULLY_RETRACTED = 500;
+    public static int GRAB_EXTENSION_TOLERANCE = 30;
+    public static int RETRACTION_TOLERANCE = 40;
+    public static int BUCKETS_EXTENSION_TOLERANCE = 10;
     
     public static double NET_ZONE_TOLERANCE = 0.7;
 
@@ -118,7 +128,15 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     public static double DIST_STRAFE_LATER = 2.5;
     public static boolean DO_TURN_DEPO = false; // Should the robot turn the pivot when depositing?
     
-    public final Pose2d retryOffset = new Pose2d(0.5, 0.5, 0);
+    // TODO: These are not able to be edited by Dash. Make them constructed when needed?
+    public static Pose2d RETRY_OFFSET = new Pose2d(0.5, 0.5, 0);
+    public static Pose2d INTAKE_OFFSET = new Pose2d(-6.25, 0, -Math.PI / 2);
+    public static Vector2d GRABBING_DISTANCE = new Vector2d(-EXTEND_TO_SAMPLE_EXTENSION / LIFT_TICKS_PER_INCH_EXTENDED, 0);
+    public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, -1, 0);
+    public static double LAST_SPIKE_ANGLE = Math.toRadians(90);
+
+    public static int MAX_GRAB_INDEX = 2;
+    public static int MIN_GRAB_INDEX = 1;
     
     public static double PIVOT_SAFE_FOR_EXTENSION = 60 * PIVOT_TICKS_PER_DEGREE; // Pivot pos when extension to buckets may occur
     public static boolean USE_PIVOT_TOLERANCE = true; // Whether to use the fancy math for hasFinishedPivot
@@ -723,12 +741,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * @throws InterruptedException
      */
     private void extendAsync() throws InterruptedException {
-        lift.extendSlides(extendToSampleExtension, 10, EXTENSION_POWER);
+        lift.extendSlides(extendToSampleExtension, GRAB_EXTENSION_TOLERANCE, EXTENSION_POWER);
     }
 
     private void extendSync(int offset) {
         final int target = extendToSampleExtension + offset;
-        final int tolerance = 10;
+        final int tolerance = GRAB_EXTENSION_TOLERANCE;
         final double power = EXTENSION_POWER;
         driveLiftTo(target, tolerance, power);
     }
@@ -743,13 +761,13 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      */
     private void retractAsync() throws InterruptedException {
         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
-        lift.extendSlides(FULLY_RETRACTED, 30, RETRACTION_POWER);
+        lift.extendSlides(FULLY_RETRACTED, RETRACTION_TOLERANCE, RETRACTION_POWER);
     }
 
     private void retractSync() {
         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         final int target = FULLY_RETRACTED;
-        final int tolerance = 50;
+        final int tolerance = RETRACTION_TOLERANCE;
         final double power = EXTENSION_POWER;
         driveLiftTo(target, tolerance, power);
     }
@@ -801,14 +819,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     private void extendToBucketsAsync() {
         lift.extendSlides(
             (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate, 
-            10, 
+            BUCKETS_EXTENSION_TOLERANCE, 
             EXTENSION_POWER
         );
     }
 
     private void extendToBucketsSync() {
         final int target = (int) AutoArmRunner2.SLIDE_CONSTANTS.topBucketHeightAlternate;
-        final int tolerance = 10;
+        final int tolerance = BUCKETS_EXTENSION_TOLERANCE;
         final double speed = EXTENSION_POWER;
         driveLiftTo(target, tolerance, speed);
     }
@@ -846,7 +864,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
     private void berriddenOfSample() throws InterruptedException {
         // The arm is raised, so put it into the basket!
         depositAsync();
-        sleep(200); // To stop from accidentally moving with the sample still in the robot's maw
+        sleep(DEPOSIT_EJECT_MS); // To stop from accidentally moving with the sample still in the robot's maw
         intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
 
         // Lowering and switching
@@ -903,13 +921,14 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         isStateInitialized = false;
         linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
+        final double grabSequenceStart = autoRuntime.seconds();
 
         retryLoop:
         while(
             (
                 !isPossessingSample(currentSampleDistance) 
-                && lightTimer.seconds() <= 4.0 
-                && getSecondsRemaining() >= 5
+                && autoRuntime.seconds() - grabSequenceStart <= GRAB_SYNC_MAX_SEC
+                && getSecondsRemaining() >= GRAB_MIN_REMAINING_SEC
             )
             && opModeIsActive()
         ) {
@@ -926,8 +945,8 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                     !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
-                    && lightTimer.seconds() <= 2.0 
-                    && getSecondsRemaining() >= 4.5
+                    && autoRuntime.seconds() <= GRAB_RETRY_SEC
+                    && getSecondsRemaining() >= GRAB_MIN_REMAINING_SEC
                     && !isPossessingSample(currentSampleDistance)
                 )
                 && opModeIsActive()
@@ -936,17 +955,13 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             }
 
             // Exiting the retry loop if we don't want to retry
-            if(!retry) {
-                break retryLoop; 
-            }
-
-            if(isPossessingSample(currentSampleDistance)) {
+            if(!retry || isPossessingSample(currentSampleDistance) || getSecondsRemaining() < GRAB_MIN_REMAINING_SEC) {
                 break retryLoop;
             }
 
             // Moving so that we have more chance of getting it.
             hoverSampleAsync();
-            setDestinationOffset(retryOffset); // Move from current position forward and a sample up
+            setDestinationOffset(RETRY_OFFSET); // Move from current position forward and a sample up
             lineTo(globalDrive, getCurrentPosition());
             resetDestinationOffset();
         }
@@ -1000,7 +1015,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
         setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
-        moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
 
@@ -1043,7 +1058,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
         setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
-        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
 
@@ -1092,7 +1107,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
         setDestinationOffset(backAway); // Move back to avoid accidental hanging
-        moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
 
@@ -1101,7 +1116,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
         setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
-        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-40, 30));
+        moveRobotToNetZone(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
 
@@ -1177,12 +1192,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
         grabDepositLoop:
-        for(int i = 2; i >= 0 && opModeIsActive(); i--) {
+        for(int i = MAX_GRAB_INDEX; i >= MIN_GRAB_INDEX && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(90) : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
-            final Pose2d grabbingDistance = i == 0 ? new Pose2d(-20, 0, 0) : new Pose2d(-20.0, 0, 0);
+            final double extraRotation = i == 0 ? LAST_SPIKE_ANGLE : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = INTAKE_OFFSET; // Offset from bot center
+            final Pose2d grabbingDistance = new Pose2d(GRABBING_DISTANCE.x, GRABBING_DISTANCE.y, extraRotation);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -1200,7 +1215,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
                 extendToSampleExtension = EXTEND_TO_SAMPLE_LAST_EXTENSION;
             } else {
-                finalOffset = addPoses(finalOffset, new Pose2d(1, 1.5, 0));
+                finalOffset = addPoses(finalOffset, NORMAL_GRAB_OFFSET);
             }
             
             // Moving to grab the sample
@@ -1219,7 +1234,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 continue grabDepositLoop;
             }
 
-            if(getSecondsRemaining() <= 3.0) {
+            if(getSecondsRemaining() <= MIN_REAMINING_SCORE_SEC) {
                 break grabDepositLoop;
             }
 
