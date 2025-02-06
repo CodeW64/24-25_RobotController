@@ -397,7 +397,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
             // Move to the spike mark using only odometry
             final Pose2d spikeTag = getTagPoseFromId(fallBackId);
             lineTo(globalDrive, new Pose2d(
-                spikeTag.position.x + centerOffset + 2,
+                spikeTag.position.x + centerOffset,
                 spikeTag.position.y - distFrom * Math.signum(centerOffset),
                 // spikeTag.heading.toDouble()
                 Math.toRadians(90)
@@ -744,7 +744,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
     protected void lineTo(MecanumDrive drive, Vector2d target) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
-        final Vector2d offsetTarget = target;
+        final Vector2d offsetTarget = target.plus(destinationOffset.position);
         final Vector2d deltaPosition = offsetTarget.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {
@@ -773,7 +773,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
     protected void lineTo(MecanumDrive drive, Vector2d target, TranslationalVelConstraint cont, ProfileAccelConstraint cont2) {
         // Moving the robot forward based on the odometry
         final Pose2d currentPos = getCurrentPosition();
-        final Vector2d offsetTarget = target;
+        final Vector2d offsetTarget = target.plus(destinationOffset.position);
         final Vector2d deltaPosition = offsetTarget.minus(currentPos.position);
         Action moveToTarget;
         if(deltaPosition.x == 0) {

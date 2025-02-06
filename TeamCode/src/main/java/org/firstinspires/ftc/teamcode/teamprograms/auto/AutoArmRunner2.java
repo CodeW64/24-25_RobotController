@@ -98,17 +98,15 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     // SERVO POSITION VALUES (editable by FTC dashboard)
     public static class ServoValues {
-        public double pivotCarryPos = 0.23;
+        public double pivotCarryPos = 0.2175;
         public double pivotDepositPos = 0.172;
         public double pivotEjectSamplePos = 0.218;
         public double pivotIntakePos = 0.1825;
         public double pivotHoverPos = 0.195;
         public double pivotRestPos = 0.195;
         
-        public double specimenGrabberLOpenPos = 0.58; // adjust
-        public double specimenGrabberROpenPos = 0.58; // adjust
-        public double specimenGrabberLClosePos = 0.47; // adjust
-        public double specimenGrabberRClosePos = 0.47; // adjust
+        public double specimenGrabberOpenPos = 0.55; // adjust
+        public double specimenGrabberClosePos = 0.625; // adjust
     }
     public static ServoValues SERVO_VALUES = new ServoValues();
 
@@ -144,7 +142,8 @@ public class AutoArmRunner2 extends LinearOpMode {
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
         public double extensionLimitIntake = 1780.0; // 312RPM-2500
-        public double extensionLimitSpecimen = 2700.0; // 312RPM-3800 // FIXME: adjust to fit within limit
+        public double extensionLimitSpecimen = 1250; // 312RPM-3800
+        public double extensionLimitWall = 70.0; // 312RPM-3800
         public double extensionLimitHang = 2700.0; // 312RPM-3800
         public double cushionRatio = 400.0;
         public double topBucketHeightAlternate = 3050; // 312RPM-4100
@@ -167,9 +166,9 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double intakePos = 100;
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
-        public double specimenGrabPos = 700; // adjust to right angle
-        public double specimenPositionPos = 1200; // adjust to right angle
-        public double specimenPlacePos = 1000; // adjust to right angle
+        public double specimenGrabPos = 764; // adjust to right angle
+        public double specimenPositionPos = 1270; // adjust to right angle
+        public double specimenPlacePos = 1190; // adjust to right angle
         public double stabilizeReady = 1300;
 
     }
@@ -192,7 +191,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         DEPOSIT_ACTIVE,
         DEPOSIT_RETRACT_SET, DEPOSIT_RETRACT, PIVOT_TO_INTAKE,
         
-        PIVOT_TO_SPECIMEN_GRAB,
+        PIVOT_TO_SPECIMEN,
         SPECIMEN_GRAB, SPECIMEN_POSITION, SPECIMEN_PLACE,
         SPECIMEN_RETRACT,
 
@@ -203,7 +202,7 @@ public class AutoArmRunner2 extends LinearOpMode {
     protected LinearSlideStates linearSlideState;
  
     enum ExtensionLimits {
-        INTAKE, DEPOSIT, SPECIMEN, HANG
+        INTAKE, DEPOSIT, SPECIMEN_POSITION, SPECIMEN_PLACE, WALL, HANG, 
     }
 
     public ElapsedTime lightTimer, setupTimer, pidTimer, slideTimer;
@@ -225,9 +224,9 @@ public class AutoArmRunner2 extends LinearOpMode {
     protected boolean isStateInitialized = false;
     protected double currentSampleDistance = 0;
 
-
     protected int linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
     private boolean isHardwareInitialized = false;
+    protected boolean isPreloaded = false;
 
 
     @Override
@@ -698,7 +697,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                     if (linearSlideAvgPosition < SLIDE_CONSTANTS.intakeEndRetract || isLinearSlideFullyRetracted(limitSwitch)) {
                         isStateInitialized = false;
                         if (specimanning) {
-                            linearSlideState = LinearSlideStates.PIVOT_TO_SPECIMEN_GRAB;
+                            linearSlideState = LinearSlideStates.PIVOT_TO_SPECIMEN;
                         } else {
                             // normal mode
                             linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
@@ -971,9 +970,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                     break;
 
             // move from intake to specimen mode, and return from specimen place
-                case PIVOT_TO_SPECIMEN_GRAB:
+                case PIVOT_TO_SPECIMEN:
                     if (!isStateInitialized) {
-                        linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenGrabPos;
+                        if(isPreloaded) {
+                            linearPivotTargetPosition = (int) PIVOT_CONSTANTS.specimenPositionPos;
+                        } else {
+                            linearPivotTargetPosition = (int)PIVOT_CONSTANTS.specimenGrabPos;
+                        }
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
 
@@ -1004,8 +1007,18 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                     // make specimen grab accessible once lift has finished pivoting
                     // (and once slide has finished retracting)
-                    if (Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.specimenGrabPos) < 20 &&
-                            isArmPositionSet) {
+                    if(
+                        isPreloaded 
+                        && Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.specimenPositionPos) < 20 
+                        // && isArmPositionSet
+                    ){
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+                    } else if (
+                        !isPreloaded 
+                        && Math.abs(linearPivotAvgPosition - PIVOT_CONSTANTS.specimenGrabPos) < 20 
+                        // && isArmPositionSet
+                    ) {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.SPECIMEN_GRAB;
                     }
@@ -1035,8 +1048,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
 
-                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
-                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = true;
                     }
@@ -1049,13 +1062,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
-                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLOpenPos);
-                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberROpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                             isGrabberOpen = true;
                         }
                     }
@@ -1066,12 +1079,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                     // pivot to positioning specimen hang once successful grab off wall
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
-                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
-                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = false;
-//                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
-                        linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
+                        linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
+                        pivotPIDSpeedMultiplier = PIVOT_DOWN_POWER;
+                        // linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
                     }
 
                     // go back to intake mode
@@ -1092,7 +1106,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                         isRunningPivotToPosition = true;
                         pidTimer.reset();
 
-                        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotDepositPos);
 
                         isStateInitialized = true;
                     }
@@ -1142,27 +1156,55 @@ public class AutoArmRunner2 extends LinearOpMode {
                         checkGTwoRB = true;
                         if (isGrabberOpen) {
                             // close grabber
-                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLClosePos);
-                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberRClosePos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                             isGrabberOpen = false;
                         } else {
                             // open grabber
-                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberLOpenPos);
-                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberROpenPos);
+                            specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                            specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                             isGrabberOpen = true;
                         }
+                    }
+
+                    // automatically let go of specimen once slides have gone down far enough to hang
+                    if (linearSlideAvgPosition < 890) {
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        isGrabberOpen = false;
                     }
 
 
                     // EXIT
 
                     // begin shift to grab upon a successful placement
+                    if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
+                        checkGTwoLT = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        pivotPIDSpeedMultiplier = PIVOT_DOWN_POWER;
+
+                        // open grabbers in case of a mis-input where the servos may be ripped off
+                        // risks dropping the specimen in the robot, but better than breaking the robot
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
+                    }
+
+                    // Go to intake if we want to
+                    // begin shift to grab upon a successful placement
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
+
+                        // open grabbers in case of a mis-input where the servos may be ripped off
+                        // risks dropping the specimen in the robot, but better than breaking the robot
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        linearSlideState = LinearSlideStates.DEPOSIT_RETRACT;
                     }
 
                     // flip back to specimen position if mistaken
@@ -1708,6 +1750,8 @@ public class AutoArmRunner2 extends LinearOpMode {
         sampleSensor.setGain(SENSOR_VARIABLES.sampleSensorGain);
 
         intakeWheelR.setDirection(DcMotorSimple.Direction.REVERSE);
+        
+        specimenGrabberR.setDirection(Servo.Direction.REVERSE);
 
         // normally enabled
         if (camera) {
