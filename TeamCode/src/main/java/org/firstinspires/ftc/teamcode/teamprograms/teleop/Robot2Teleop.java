@@ -2408,6 +2408,11 @@ public class Robot2Teleop extends LinearOpMode {
             linearSlidePower = (-gamepad2.right_stick_y)*SLIDE_SPEED;
         }
 
+        // lower slide power even more if in specimen place
+        if (limit == ExtensionLimits.SPECIMEN_PLACE) {
+            linearSlidePower*=0.4;
+        }
+
         // for deposit only
         if (limit == ExtensionLimits.DEPOSIT || limit == ExtensionLimits.SPECIMEN_POSITION ||
             limit == ExtensionLimits.WALL || limit == ExtensionLimits.SPECIMEN_PLACE) {
@@ -2426,11 +2431,6 @@ public class Robot2Teleop extends LinearOpMode {
             }
             // apply a coefficient to fight gravity (slide holds power to retract)
             linearSlidePower-=SLIDE_CONSTANTS.gravityCoefficient;
-        }
-
-        // lower slide power even more if in specimen place
-        if (limit == ExtensionLimits.SPECIMEN_PLACE) {
-            linearSlidePower*=0.4;
         }
 
         // calculate acceleration
