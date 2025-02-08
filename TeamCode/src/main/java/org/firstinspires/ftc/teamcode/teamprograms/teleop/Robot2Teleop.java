@@ -16,6 +16,7 @@ import com.qualcomm.robotcore.hardware.TouchSensor;
 import com.qualcomm.robotcore.util.ElapsedTime;
 import com.qualcomm.robotcore.util.Range;
 
+import org.firstinspires.ftc.robotcore.external.JavaUtil;
 import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
 import org.firstinspires.ftc.robotcore.external.navigation.DistanceUnit;
 import org.firstinspires.ftc.teamcode.RobotVision;
@@ -129,15 +130,37 @@ public class Robot2Teleop extends LinearOpMode {
 
     // SENSOR VARIABLES (editable by FTC dashboard)
     public static class SensorVariables {
-        public float sampleSensorGain = 1.0f;
-        public double sampleDistance = 3.2;
-        public double sampleCodeBlue = 0.007;
+        public double sampleSensorGain = 200.0;
+        public double sampleDistance = 3.2; // inches
         public double glassesDistance = 11; // inches
         public double glassesBearing = 7; // degrees
         public double glassesYaw = 5; // degrees
         public double glassesCameraAngle = 60; // degrees
+        
+        // Color detection variables
+        public double blueMaxHue = 250; // degrees
+        public double blueMinHue = 180; // degrees
+
+        // NOTE: Neutral samples have the worst accurate detection range (<= 6cm)
+        //       so the max sensing distance is 6cm. Red an blue can be sensed 
+        //       for 6-8cm. If neutral samples are to be ignored, feel free to 
+        //       change maxColorDistCm!  
+        public double maxColorDistCm = 6; // centimeters
+        public double minSaturation = 0.3; // in range 0 - 1, where 0 is grays and 1 is kinda neon
+
+        public double redMaxHue = 80; // degrees
+        public double redMinHue = 0; // degrees
+        public double neutralMaxHue = 120; // degrees
+        public double neutralMinHue = 80; // degrees
     }
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
+
+    public static enum Alliance { 
+        NEUTRAL, 
+        BLUE, 
+        RED, 
+        UNKNOWN 
+    }
 
     // STABILIZER VARIABLES
     public static class StabilizerConstants {
@@ -1124,7 +1147,7 @@ public class Robot2Teleop extends LinearOpMode {
                         isArmPositionSet = false;
                         isStateInitialized = true;
                     }
-
+ 
 
                     // stop slides once finished retracting
                     // (slides started retracting in DEPOSIT_RETRACT)
@@ -2304,6 +2327,7 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Sample Sensor Gain", sampleSensor.getGain());
             telemetry.addData("Sample DIST (CM)", sampleSensor.getDistance(DistanceUnit.CM));
             telemetry.addLine("(operating range 1-10 centimeters)");
+            telemetry.addData("Color", getCurrentSampleAlliance());
             telemetry.addData("Red", sampleSensor.getNormalizedColors().red);
             telemetry.addData("Green", sampleSensor.getNormalizedColors().green);
             telemetry.addData("Blue", sampleSensor.getNormalizedColors().blue);
@@ -2344,6 +2368,100 @@ public class Robot2Teleop extends LinearOpMode {
             // robot did not get sample
             return false;
         }
+    }
+
+    /**
+     * Judges the current sample's alliance based on the color sensor. Criteria
+     * for each of the colors is determined in SENSOR_VARIABLES. If the color is
+     * not recognized, UNKNOWN will be returned.
+     * 
+     * <p> The observed color must be in range (specified in 
+     * SENSOR_VARIABLES.maxColorDistCm) to return an accruate color. LED should 
+     * be enabled and on for the most accurate reading.
+     * 
+     * @return Alliance corresponding to the current color sensed, or UNKNOWN if 
+     *     not reecognized or out of range
+     */
+    public Alliance getCurrentSampleAlliance() {
+        sampleSensor.setGain((float) SENSOR_VARIABLES.sampleSensorGain); // Making sure the color is amplified enough 
+
+        // Getting the measured RGB
+        final int red = sampleSensor.red();
+        final int green = sampleSensor.green();
+        final int blue = sampleSensor.blue();
+
+        // Converting the RGB to HSV to make it easier to pick out the color.
+        final double hue = JavaUtil.rgbToHue(red, green, blue);
+        final double saturation = JavaUtil.rgbToSaturation(red, green, blue);
+        // final double value = JavaUtil.rgbToValue(red, green, blue); // Just returns 1 cause an LED is shining RIGHT AT IT.
+
+        // Returning the current alliance based off of the color
+        final double dist = sampleSensor.getDistance(DistanceUnit.CM);
+        return determineAlliance(hue, saturation, dist);
+    }
+
+    /**
+     * Determines the alliance based on the given color and distance. If any
+     * hue, saturation, or distance criteria are not met, or if multiple colors
+     * recognized, the color will be UNKNOWN. 
+     * 
+     * <p> Mins, maxes, and ranges for the paramaters are determined in 
+     * SENSOR_VARIABLES
+     * 
+     * <p> NOTE: If you want to get the current alliance based only off of the 
+     * intake's color-range sensor, please use {@code getCurrentSampleAlliance}.
+     * 
+     * @param hue Measured color's hue, in range 0 - 360 (exclusive) where 0 is 
+     *     red, 120 is lime, and 240 blue
+     * @param sat Measured saturation, in range 0 - 1.0 (inclusive). Dictates 
+     *     "how much color" is observed.
+     * @param distCm Current distance from the sensor to the object, in 
+     *     centimeters
+     * @return The closest interpretation of the color values, or UNKNOWN if 
+     *     unrecognized or out of range
+     */
+    private Alliance determineAlliance(double hue, double sat, double distCm) {
+        // If the color cannot be safely determined
+        if(sat < SENSOR_VARIABLES.minSaturation || distCm >= SENSOR_VARIABLES.maxColorDistCm) {
+            return Alliance.UNKNOWN;
+        } 
+
+        final boolean isYellow = SENSOR_VARIABLES.neutralMinHue <= hue && hue <= SENSOR_VARIABLES.neutralMaxHue;
+        final boolean isRed    = SENSOR_VARIABLES.redMinHue     <= hue && hue <= SENSOR_VARIABLES.redMaxHue;
+        final boolean isBlue   = SENSOR_VARIABLES.blueMinHue    <= hue && hue <= SENSOR_VARIABLES.blueMaxHue;
+
+        // Check for nonsense and possibly return neutral
+        if(isYellow) {
+            if(isRed || isBlue) {
+                // Two or more colors were matched; the color is nonsense
+                return Alliance.UNKNOWN;
+            }
+
+            return Alliance.NEUTRAL;
+        }
+        
+        // Check for nonsense and possibly return red
+        if(isRed) {
+            if(isBlue || isYellow) {
+                // Two or more colors were matched; the color is nonsense
+                return Alliance.UNKNOWN;
+            }
+
+            return Alliance.RED;
+        }
+
+        // Check for nonsense and possibly return blue
+        if(isBlue) {
+            if(isRed || isYellow) {
+                // Two or more colors were matched; the color is nonsense
+                return Alliance.UNKNOWN;
+            }
+
+            return Alliance.BLUE;
+        }
+
+        // The color was unrecognized; the color is unknown
+        return Alliance.UNKNOWN;
     }
 
 
@@ -2615,7 +2733,7 @@ public class Robot2Teleop extends LinearOpMode {
         linearPivotRight.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
         linearPivotLeft.setMode(DcMotor.RunMode.RUN_USING_ENCODER);
 
-        sampleSensor.setGain(SENSOR_VARIABLES.sampleSensorGain);
+        sampleSensor.setGain((float) SENSOR_VARIABLES.sampleSensorGain);
 
         intakeWheelR.setDirection(DcMotorSimple.Direction.REVERSE);
         specimenGrabberR.setDirection(Servo.Direction.REVERSE);
