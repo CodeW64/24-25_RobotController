@@ -639,6 +639,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
                         isStateInitialized = false;
                         isIntakeProtected = false;
+                        specimanning = false;
                         linearSlideState = LinearSlideStates.INTAKE_RETRACT;
                     }
 
@@ -960,13 +961,13 @@ public class AutoArmRunner2 extends LinearOpMode {
                     // ABORT
 
                     // go back to deposit if mistaken
-                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
-                        checkGTwoLT = true;
-                        isStateInitialized = false;
-                        isIntakeProtected = true;
+                    // if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                    //     checkGTwoLT = true;
+                    //     isStateInitialized = false;
+                    //     isIntakeProtected = true;
 
-                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
-                    }
+                    //     linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT;
+                    // }
                     break;
 
             // move from intake to specimen mode, and return from specimen place

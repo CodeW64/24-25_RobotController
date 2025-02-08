@@ -62,7 +62,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private int coloredTagId = AprilLocater.COLORED_BLUE_ID;
     private boolean repositionEnabled = false;
     // DEV: This line is true to do testing; please make it false by thurs
-    private static boolean isTeleopMode = false; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
+    public static boolean isTeleopMode = false; // FIXME: MAKE SURE THIS IS ____NEVER___ ENABLED OR ALLOWED IN A MATCH
     private static boolean isDebugMode = false;
 
     private ButtonPressHandler toggleBlueSide;
@@ -111,9 +111,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static double MIN_REAMINING_SCORE_SEC = 3.0;
 
     public static int CHAMBER_EXTENSION = 1300;
-    public static int EXTEND_TO_SAMPLE_EXTENSION = 1150;
+    public static int EXTEND_TO_SAMPLE_EXTENSION = 1300;
     public static int EXTEND_TO_SAMPLE_LAST_EXTENSION = 1300;
     public static int FULLY_RETRACTED = 500;
+    public static int HOOK_RETRACTION = 300;
     public static int GRAB_EXTENSION_TOLERANCE = 30;
     public static int RETRACTION_TOLERANCE = 40;
     public static int BUCKETS_EXTENSION_TOLERANCE = 10;
@@ -126,21 +127,21 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static double DIST_INCREMENT = -0.5; // NOTE: change this when roadRunner is tuned
     public static double DIST_STRAFE = 2.5;
     public static double DIST_STRAFE_LATER = 2.5;
-    public static double SPECIMEN_PLACE_OFFSET = 1.0;
+    public static double SPECIMEN_PLACE_OFFSET = 2.2;
     public static boolean DO_TURN_DEPO = false; // Should the robot turn the pivot when depositing?
     
     // TODO: These are not able to be edited by Dash. Make them constructed when needed?
     //       Another thought: Make a class "PoseInit" with x, y, and theta attributes,
     //       and construct the Pose2ds at runtime? Call a method on the PoseInits to convert
     //       to a Pose2d? Food for thought. 🍗
-    public static Pose2d RETRY_OFFSET = new Pose2d(0.5, 0.5, 0);
+    public static Pose2d RETRY_OFFSET = new Pose2d(0.5, 1, 0);
     public static Pose2d INTAKE_OFFSET = new Pose2d(-6.25, 0, -Math.PI / 2);
     public static Vector2d GRABBING_DISTANCE = new Vector2d(-EXTEND_TO_SAMPLE_EXTENSION / LIFT_TICKS_PER_INCH_EXTENDED, 0);
-    public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, -1, 0);
+    public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, -0.25, 0);
     public static double LAST_SPIKE_ANGLE = Math.toRadians(90);
 
-    public static int MAX_GRAB_INDEX = -1; // DEV: Make this so that the loop can actually run
-    public static int MIN_GRAB_INDEX = Integer.MAX_VALUE; // DEV: Make this so that the loop can actually run
+    public static int MAX_GRAB_INDEX = 2;
+    public static int MIN_GRAB_INDEX = 1;
     
     public static double PIVOT_SAFE_FOR_EXTENSION = 60 * PIVOT_TICKS_PER_DEGREE; // Pivot pos when extension to buckets may occur
     public static double SPECIMEN_SAFE_FOR_EXTENSION = 1280; // Pivot pos when extension to buckets may occur
@@ -385,6 +386,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             );
 
             // Starting the processes
+            isPreloaded = false;
             runningThreads.add(buttonPresser);
             runningThreads.add(armSwitcher);
             buttonPresser.start();
@@ -412,8 +414,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             hasStartedSwitch = true;
             
             // Initialize the process for switiching
-            final ConditionalThread buttonPresser = new ConditionalThread("switchArmMode.buttonPresser", ThreadIdentifiers.SWITCH);
-            final ConditionalThread armSwitcher = new ConditionalThread("switchArmMode.armSwitcher", ThreadIdentifiers.SWITCH);
+            final ConditionalThread buttonPresser = new ConditionalThread("switchToChamber.buttonPresser", ThreadIdentifiers.SWITCH);
+            final ConditionalThread armSwitcher = new ConditionalThread("switchToChamber.armSwitcher", ThreadIdentifiers.SWITCH);
 
             buttonPresser.finishInitialization(
                 () -> linearSlideState.equals(LinearSlideStates.PIVOT_TO_SPECIMEN), 
@@ -467,7 +469,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 // i--;
             }
             runningThreads.clear();
-            interrupt();
+            try {
+                interrupt();
+            } catch(SecurityException err) {
+                // Not much I want to do here
+            }
         }
 
         /**
@@ -812,6 +818,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         linearSlideRight.setPower(0);
         intakeWheelR.setPower(INTAKE_POWER_MAX);
         intakeWheelL.setPower(INTAKE_POWER_MAX);
+        intakePivot.setPosition(SERVO_VALUES.pivotIntakePos);
     }
 
     private void hoverSampleAsync() throws InterruptedException {
@@ -1057,7 +1064,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     }
 
     private void hookChamberSync() throws InterruptedException {
-        lift.extendSlides(FULLY_RETRACTED, RETRACTION_TOLERANCE, 0.5);
+        driveLiftTo(HOOK_RETRACTION, RETRACTION_TOLERANCE, 0.5);
     }
 
     private void pivotDownSync() throws InterruptedException {
@@ -1084,8 +1091,20 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     private void moveAndPlaceSpecimen(TranslationalVelConstraint cont, ProfileAccelConstraint cont2) 
         throws InterruptedException 
     {
-        lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)), cont, cont2 );
+        // lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)), cont, cont2 );
         lift.switchToChamber();
+
+        // Extend, move, and wait for the switch before hooking
+        final double SAFETY_DIST = 24; // Used to prevent contact with the 
+        final double ALLIANCE_SHARING_DIST = 2; // Inches from the tile teeth, for space
+
+        final Vector2d dest = new Vector2d(
+            -48 + ROBOT_CENTER.position.x + SPECIMEN_PLACE_OFFSET, 
+            BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y + ALLIANCE_SHARING_DIST
+        );
+        resetDestinationOffset();
+        lineTo(globalDrive, dest, cont, cont2);
+        
     
         // Wait for the pivot to be reasonably rotated before extending 
         while(
@@ -1096,17 +1115,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             Thread.sleep(30); // Give time to other threads to do their thang
         }
 
-        // Extend, move, and wait for the switch before hooking
-        final double SAFETY_DIST = 24; // Used to prevent contact with the 
-        final double ALLIANCE_SHARING_DIST = 2; // Inches from the tile teeth, for space
+        
         extendToChambersAsync();
-
-        final Vector2d dest = new Vector2d(
-            -48 + ROBOT_CENTER.position.x + SPECIMEN_PLACE_OFFSET, 
-            BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y + ALLIANCE_SHARING_DIST
-        );
-        resetDestinationOffset();
-        lineTo(globalDrive, dest, cont, cont2);
         lift.waitForFinish();
 
         // Moving forward and hooking onto the chamber'
@@ -1172,7 +1182,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             new TranslationalVelConstraint(MAX_NET_VEL), 
             new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL)
         );
-        // switchArmAsync();
+        switchArmAsync();
         resetDestinationOffset();
 
         // Driving to the spike marks
@@ -1181,9 +1191,11 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         for(int i = MAX_GRAB_INDEX; i >= MIN_GRAB_INDEX && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? LAST_SPIKE_ANGLE : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = INTAKE_OFFSET; // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(GRABBING_DISTANCE.x, GRABBING_DISTANCE.y, extraRotation);
+            final double extraRotation = i == 0 ? Math.toRadians(90) : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = i == 0 
+                ? new Pose2d(-GRABBING_DISTANCE / LIFT_TICKS_PER_INCH_EXTENDED, 0, 0) 
+                : new Pose2d(-20.0, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -1201,18 +1213,25 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
                 extendToSampleExtension = EXTEND_TO_SAMPLE_LAST_EXTENSION;
             } else {
-                finalOffset = addPoses(finalOffset, NORMAL_GRAB_OFFSET);
+                finalOffset = addPoses(finalOffset, new Pose2d(1, -0.25, 0));
             }
             
             // Moving to grab the sample
-            extendAsync();
-
             setDestinationOffset(finalOffset); // Puts the robot into grabbing position
             globalDrive.updatePoseEstimate();
             setRotationType(RotationType.SPLINE);
+
+            if(!isFirstSpikeSample) {
+                extendAsync();
+            }
+
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
 
-            // Grabbing the sample
+            if(isFirstSpikeSample) {
+                extendSync(0);
+            }
+
+            // Grabbing the pixel
             resetDestinationOffset();
             grabSampleSequence(true, 0); // Grab the pixel. and retract
 
@@ -1220,24 +1239,49 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 continue grabDepositLoop;
             }
 
-            if(getSecondsRemaining() <= MIN_REAMINING_SCORE_SEC) {
-                break grabDepositLoop;
-            }
-
-            // Retracting to make sure the pivot can lift the arm
             retractSync();
-            
+
+            // Waiting for the arm to go up and out of the way
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
 
-            scoreSequence(i);
+            switchArmAsync(); // Switch the arm up
+            
+            // Moving to score
+            distBack = DIST_BACK_LATER - DIST_INCREMENT * (2 - i);
+            distStrafe = DIST_STRAFE_LATER;
+            backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
+            setDestinationOffset(backAway); // Move back to avoid accidental hanging
+            
+            MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+            globalDrive.updatePoseEstimate();
+            moveRobotToNetZoneCcw(isBlue, new Action() {
+                @Override
+                public boolean run(TelemetryPacket p) {
+                    if(lift.hasFinishedPivot()) {
+                        extendToBucketsAsync(); // Extend to the buckets once we have done our signature turn.
+                        return false;
+                    }
+                    return true;
+                } 
+            }, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-30, 30));
+            MecanumDrive.PARAMS.positionTolerance = 1.0;    
+            
+            resetDestinationOffset();
+            lift.waitForFinish();
+
+            berriddenOfSample();
             isFirstSpikeSample = false;
         }
 
         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         lift.extendSlides(0, 30, -1.0);
 
+        // if(goToAscent) {
+            // setDestinationOffset(new Pose2d(0, 24, 0));
+            // moveRobotToAscent(); 
+        // }
 
         lift.waitForFinish();
 
@@ -1366,7 +1410,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         
         if(gamepad1.right_bumper && !right_bumper) {switchArmAsync(); right_bumper = true;} // Worked going into deps; never exited from it UNLESS you depositted        
         
-        // if(buttonHandler) {netMoveSync();}
+        if(gamepad1.start && !start) {lift.switchToChamber(); start = true;}
         
         // if(buttonHandler) {moveAndPlaceSpecimen();} 
 

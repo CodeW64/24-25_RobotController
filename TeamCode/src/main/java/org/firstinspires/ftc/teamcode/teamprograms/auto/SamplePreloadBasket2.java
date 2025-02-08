@@ -1192,12 +1192,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;
         grabDepositLoop:
-        for(int i = MAX_GRAB_INDEX; i >= MIN_GRAB_INDEX && opModeIsActive(); i--) {
+        for(int i = 2; i >= 1 && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? LAST_SPIKE_ANGLE : 0; // Rotate more cuz' last one's hard to get to. 
-            final Pose2d intakeOffset = INTAKE_OFFSET; // Offset from bot center
-            final Pose2d grabbingDistance = new Pose2d(GRABBING_DISTANCE.x, GRABBING_DISTANCE.y, extraRotation);
+            final double extraRotation = i == 0 ? Math.toRadians(90) : 0; // Rotate more cuz' last one's hard to get to. 
+            final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
+            final Pose2d grabbingDistance = i == 0 ? new Pose2d(-20, 0, 0) : new Pose2d(-20.0, 0, 0);
             
             // Finding the offset
             final Pose2d totalOffset = addPoses(intakeOffset, grabbingDistance);
@@ -1215,43 +1215,69 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
                 finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
                 extendToSampleExtension = EXTEND_TO_SAMPLE_LAST_EXTENSION;
             } else {
-                finalOffset = addPoses(finalOffset, NORMAL_GRAB_OFFSET);
+                finalOffset = addPoses(finalOffset, new Pose2d(1, 1.5, 0));
             }
             
             // Moving to grab the sample
-            extendAsync();
-
             setDestinationOffset(finalOffset); // Puts the robot into grabbing position
             globalDrive.updatePoseEstimate();
             setRotationType(RotationType.SPLINE);
+
+            extendAsync();
+
             moveRobotToSpikeMark(spikeMark, i, this.neutralTagId);
 
-            // Grabbing the sample
+            // Grabbing the pixel
             resetDestinationOffset();
-            grabSampleSequence(true, 0); // Grab the pixel. and retract
+            grabSampleSequence(false, 0); // Grab the pixel. and retract
 
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
 
-            if(getSecondsRemaining() <= MIN_REAMINING_SCORE_SEC) {
-                break grabDepositLoop;
-            }
-
-            // Retracting to make sure the pivot can lift the arm
             retractSync();
-            
+
+            // Waiting for the arm to go up and out of the way
             if(!isPossessingSample(currentSampleDistance)) {
                 continue grabDepositLoop;
             }
 
-            scoreSequence(i);
+            switchArmAsync(); // Switch the arm up
+            
+            // Moving to score
+            distBack = DIST_BACK_LATER - DIST_INCREMENT * (2 - i);
+            distStrafe = DIST_STRAFE_LATER;
+            backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
+            setDestinationOffset(backAway); // Move back to avoid accidental hanging
+            
+            MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+            globalDrive.updatePoseEstimate();
+            moveRobotToNetZoneCcw(isBlue, new Action() {
+                @Override
+                public boolean run(TelemetryPacket p) {
+                    if(lift.hasFinishedPivot()) {
+                        extendToBucketsAsync(); // Extend to the buckets once we have done our signature turn.
+                        return false;
+                    }
+                    return true;
+                } 
+            }, new TranslationalVelConstraint(30), new ProfileAccelConstraint(-30, 30));
+            MecanumDrive.PARAMS.positionTolerance = 1.0;    
+            
+            resetDestinationOffset();
+            lift.waitForFinish();
+
+            berriddenOfSample();
             isFirstSpikeSample = false;
         }
 
         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         lift.extendSlides(0, 30, -1.0);
 
+        // if(goToAscent) {
+            // setDestinationOffset(new Pose2d(0, 24, 0));
+            // moveRobotToAscent(); 
+        // }
 
         lift.waitForFinish();
 
