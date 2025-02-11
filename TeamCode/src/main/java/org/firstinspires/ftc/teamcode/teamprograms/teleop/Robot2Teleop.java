@@ -1596,17 +1596,26 @@ public class Robot2Teleop extends LinearOpMode {
 
                     // ABORT
 
-                    // go back to deposit if mistaken
+                    // go back to something if mistaken
                     if (gamepad2.dpad_up && !checkGTwoDUP) {
                         checkGTwoDUP = true;
                         isStateInitialized = false;
-                        linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
+                        if (specimanning) {
+                            // speciman grab
+                            linearSlideState = LinearSlideStates.PIVOT_TO_SPECIMEN_GRAB;
+                        } else {
+                            // deposit
+                            linearSlideState = LinearSlideStates.PIVOT_TO_DEPOSIT_REVERSE;
+                        }
                     }
                     break;
 
                 case HANG_TIME_OG:
                     if (!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinStop);
+
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
 
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
