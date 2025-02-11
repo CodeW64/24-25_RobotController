@@ -36,7 +36,7 @@ import java.util.ArrayList;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-@TeleOp(group="A")
+@TeleOp(group="AAA")
 @Config
 public class Robot2TestSampleSensor extends LinearOpMode {
 
