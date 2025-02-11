@@ -1049,8 +1049,8 @@ public class AutoArmRunner2 extends LinearOpMode {
                         intakeWheelR.setPower(0);
                         intakeWheelL.setPower(0);
 
-                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
-                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                         isGrabberOpen = false;
                         isStateInitialized = true;
                     }
@@ -1078,20 +1078,19 @@ public class AutoArmRunner2 extends LinearOpMode {
                     // EXIT
 
                     // pivot to positioning specimen hang once successful grab off wall
-                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
-                        checkGTwoLT = true;
+                    if (gamepad2.left_bumper && !checkGTwoLB) {
+                        checkGTwoLB = true;
                         specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
                         isGrabberOpen = false;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
-                        pivotPIDSpeedMultiplier = PIVOT_DOWN_POWER;
                         // linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
                     }
 
                     // go back to intake mode
-                    if (gamepad2.left_bumper && !checkGTwoLB) {
-                        checkGTwoLB = true;
+                    if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
+                        checkGTwoLT = true;
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
                     }

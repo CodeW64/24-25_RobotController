@@ -376,7 +376,7 @@ abstract public class AutoCommonPaths extends AprilLocater {
         final double HALF_TAG_LENGTH = 1.75; // inches
         final double TILE_SIZE = 24;         // In inches
         final double EACH_SPIKE_DIST = 10;   // In inches
-        final double ZERO_DIST = 2;          // Spike 0's distance from wall, in inches
+        final double ZERO_DIST = 4;          // Spike 0's distance from wall, in inches
         final double distFrom = EACH_SPIKE_DIST * markNum + ZERO_DIST;
 
         // Getting the offset from the edge to the center of the spike mark
