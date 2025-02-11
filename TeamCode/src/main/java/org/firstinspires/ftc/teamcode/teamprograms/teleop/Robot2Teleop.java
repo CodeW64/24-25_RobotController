@@ -25,7 +25,7 @@ import org.firstinspires.ftc.teamcode.teamprograms.DistanceGetter;
 
 /**
  * Welcome! <br>
- * Teleop Version: <strong>2.10.0 RELEASE</strong> <br>
+ * Teleop Version: <strong>2.11.2 RELEASE</strong> <br>
  * STARTING POSITION/STATE: <strong>INTAKE_ACTIVE</strong> <br>
  * Please note: this program may be a crime scene of comments and technical debt.
  **/
@@ -155,15 +155,21 @@ public class Robot2Teleop extends LinearOpMode {
     }
     public static SensorVariables SENSOR_VARIABLES = new SensorVariables();
 
-    public static enum Alliance { 
-        NEUTRAL, 
-        BLUE, 
-        RED, 
-        UNKNOWN 
+    public enum Alliance {
+        NEUTRAL("No Alliance Selected"),
+        BLUE("Blue Alliance"),
+        RED("Red Alliance"),
+        UNKNOWN("N/A");
+
+        final String name;
+        Alliance(String name) {
+            this.name = name;
+        }
     }
+    Alliance robotAlliance;
 
     // STABILIZER VARIABLES
-    public static class StabilizerConstants {
+   /* public static class StabilizerConstants {
         public double hookRadius = 1.25; // Inches
         public double drawBack = 1; // Inches
         public double distFromBarrier = 13.5; // X direction offset from barrier
@@ -172,8 +178,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double heightSensorOffsetY = -3.5; // Inches up from pivot
         public double highRungHeight = 35.5; // Inches
     }
-
-    public static StabilizerConstants STABILIZER_CONSTANTS = new StabilizerConstants();
+    public static StabilizerConstants STABILIZER_CONSTANTS = new StabilizerConstants();*/
 
     /*public DistanceGetter heightGetter = (DistanceUnit unit) -> {
         // final double theta = imu.getRobotYawPitchRollAngles().getPitch(AngleUnit.RADIANS); 
@@ -189,8 +194,8 @@ public class Robot2Teleop extends LinearOpMode {
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
         public double extensionLimitIntake = 1780.0; // 312RPM-2500
-        public double extensionLimitSpecimen = 1250.0; // 312RPM-3800 // FIXME: adjust to fit within limit
-        public double extensionLimitWall = 70.0; // FIXME: adjust so pivot can lift up at max
+        public double extensionLimitSpecimen = 1245.0;
+        public double extensionLimitWall = 70.0;
         public double extensionLimitHang = 2700.0; // 312RPM-3800
         public double cushionRatio = 400.0;
         public double topBucketHeightAlternate = 3000.0; // 312RPM-4100 // 435RPM was 2930.0
@@ -213,7 +218,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
         public double hangOGPos = 2125;
-        public double specimenGrabPos = 764; // adjust to right angle
+        public double specimenGrabPos = 750; // adjust to right angle
         public double specimenPositionPos = 1270; // adjust to right angle
         public double specimenPlacePos = 1190; // adjust to right angle
         public double stabilizeReady = 1310;
@@ -266,16 +271,6 @@ public class Robot2Teleop extends LinearOpMode {
     enum ExtensionLimits {
         INTAKE, DEPOSIT, SPECIMEN_POSITION, SPECIMEN_PLACE, WALL, HANG
     }
-
-    /*enum ActuatorHangStates {
-        HANDS_INITIALIZE,
-        HANDS_UP, HANDS_DOWN,
-        HANDS_AT_REST,
-        HANDS_RESET
-    }
-    ActuatorHangStates actuatorHangState;
-    double storedActuatorTime = 0.0;
-    boolean isRobot2ndLevelAscending = false;*/
 
 
     ElapsedTime lightTimer, actuatorTimer, pidTimer;
@@ -385,6 +380,10 @@ public class Robot2Teleop extends LinearOpMode {
         pidTimer.startTime();
 
 
+        // set game alliance to neutral to start
+        // this allows the robot to collect any sample,
+        // in case it was forgotten to select an alliance at the start
+        robotAlliance = Alliance.NEUTRAL;
         while (opModeInInit()) {
 
             // change drive mode
@@ -394,9 +393,20 @@ public class Robot2Teleop extends LinearOpMode {
                 tankDrive = false;
             }
 
+            // change alliance
+            if (gamepad1.right_trigger > 0.1) {
+                robotAlliance = Alliance.RED;
+            } else if (gamepad1.left_trigger > 0.1) {
+                robotAlliance = Alliance.BLUE;
+            }
+
 
             // START
-            telemetry.addLine("TELEOP VERSION 2.10.0 RELEASE");
+            telemetry.addLine("TELEOP VERSION 2.11.2 RELEASE");
+            telemetry.addLine("-------------------------");
+            telemetry.addData("CURRENT ALLIANCE", robotAlliance.name);
+            telemetry.addLine("CONTROLLER 1 RIGHT TRIGGER: RED ALLIANCE");
+            telemetry.addLine("CONTROLLER 1 LEFT TRIGGER: BLUE ALLIANCE");
             telemetry.addLine("-------------------------");
             telemetry.addData("TANK DRIVE", tankDrive);
             telemetry.addLine("CONTROLLER 1  RIGHT BUMPER: TANK DRIVE");
@@ -412,13 +422,12 @@ public class Robot2Teleop extends LinearOpMode {
         actuatorTimer.reset();
         pidTimer.reset();
         linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
-//        actuatorHangState = ActuatorHangStates.HANDS_INITIALIZE;
         int linearPivotTargetPosition = (int)PIVOT_CONSTANTS.intakePos;
 
-//        specimenGrabber.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
 
-        double desiredArmTheta = 0; 
-        double desiredArmLength = 0; 
+
+//        double desiredArmTheta = 0;
+//        double desiredArmLength = 0;
 
         // RUN LOOP -----------------------------------------------------------------------------
 
@@ -647,11 +656,18 @@ public class Robot2Teleop extends LinearOpMode {
 
                         // figure out if robot has grabbed sample
                         if (isPossessingSample(currentSampleDistance)) {
-                            // robot has successfully acquired a sample
-                            linearSlideState = LinearSlideStates.INTAKE_FULL;
+                            // robot has sample, find out the details of the suspect
+                            Alliance currentSample = getSamplePossession();
+
+                            if (currentSample == robotAlliance || currentSample == Alliance.NEUTRAL) {
+                                // checks out, give it to the robot
+                                linearSlideState = LinearSlideStates.INTAKE_FULL;
+                            } else {
+                                // IMPOSTER!!!
+                                linearSlideState = LinearSlideStates.INTAKE_EMPTY;
+                            }
                         } else {
                             // robot did not get sample
-                            // FIXME: change back to intake empty if not work
                             linearSlideState = LinearSlideStates.INTAKE_ACTIVE;
                         }
                     } else if (lightTimer.seconds() > 0.6) {
@@ -672,7 +688,9 @@ public class Robot2Teleop extends LinearOpMode {
                     }
                     break;
 
+
             // attempt to split the samples close together for easier grabbing
+            // this state is never used but I will keep it in the program
                 case INTAKE_DIVIDE_SAMPLE:
 
                     if (!isStateInitialized) {
@@ -722,6 +740,9 @@ public class Robot2Teleop extends LinearOpMode {
                     if (!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinActive);
 
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+
                         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
                         isIntakeProtected = true;
                         intakeWheelR.setPower(INTAKE_POWER_HOLD);
@@ -754,6 +775,7 @@ public class Robot2Teleop extends LinearOpMode {
                     // start sequence to pivot to deposit
                     if (gamepad2.left_trigger > 0.1 && !checkGTwoLT) {
                         checkGTwoLT = true;
+                        specimanning = false;
 //                        isGoingToHangTime = false;
 
                         linearSlideRight.setPower(0);
@@ -1369,6 +1391,15 @@ public class Robot2Teleop extends LinearOpMode {
                         isStateInitialized = false;
                         linearSlideState = LinearSlideStates.PIVOT_TO_INTAKE;
                     }
+
+                    // go to hanging
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_HANG_TIME_OG;
+                    }
                     break;
 
 
@@ -1399,7 +1430,7 @@ public class Robot2Teleop extends LinearOpMode {
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
                         checkGTwoRT = true;
                         isStateInitialized = false;
-                        pivotPIDSpeedMultiplier = PIVOT_CONSTANTS.retractSetSpeedMultiplier; // FIXME
+                        pivotPIDSpeedMultiplier = PIVOT_CONSTANTS.retractSetSpeedMultiplier;
                         linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
                     }
 
@@ -1412,7 +1443,7 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
-                        pivotPIDSpeedMultiplier = 1.0; // FIXME
+                        pivotPIDSpeedMultiplier = 1.0;
                         linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
                     }
 
@@ -1474,7 +1505,7 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
-                        pivotPIDSpeedMultiplier = 1.0; // FIXME
+                        pivotPIDSpeedMultiplier = 1.0;
 
                         // open grabbers in case of a mis-input where the servos may be ripped off
                         // risks dropping the specimen in the robot, but better than breaking the robot
@@ -1488,7 +1519,7 @@ public class Robot2Teleop extends LinearOpMode {
                     if (gamepad2.right_trigger > 0.1 && !checkGTwoRT) {
                         checkGTwoRT = true;
                         isStateInitialized = false;
-                        pivotPIDSpeedMultiplier = 1.0; // FIXME
+                        pivotPIDSpeedMultiplier = 1.0;
                         linearSlideState = LinearSlideStates.SPECIMEN_POSITION;
                     }
                     break;
@@ -1588,11 +1619,12 @@ public class Robot2Teleop extends LinearOpMode {
                     linearSlideRight.setPower(linearSlidePower);
                     linearSlideLeft.setPower(linearSlidePower);
 
-                    // TODO: eventually add a jitter button for pivot?
 
                     // EXIT
 
                     // go back to deposit
+                    // too bad if you were specimanning I guess
+                    // HINT ---> Simply just don't press dpad_up by accident!
                     if (gamepad2.dpad_up && !checkGTwoDUP) {
                         checkGTwoDUP = true;
                         linearSlideRight.setPower(0);
@@ -2269,7 +2301,7 @@ public class Robot2Teleop extends LinearOpMode {
 
 
 // TELEMETRY ------------------------------------------------------------------------------------
-            telemetry.addData("PIVOT TOLERANCE", pivotController.getTolerance()[0]);
+            telemetry.addData("ALLIANCE", robotAlliance);
             telemetry.addData("Duck Disabled", disableDuck);
             telemetry.addLine("MANUAL OVERRIDE: (gamepad 2) dpad_down + button_a");
             telemetry.addLine("-------------------------");
@@ -2300,7 +2332,7 @@ public class Robot2Teleop extends LinearOpMode {
             telemetry.addData("Slide L POS", linearSlideLeft.getCurrentPosition());
             telemetry.addData("Slide AVG POS", linearSlideAvgPosition);
             telemetry.addData("Slide AVG Extension (in)", liftTicksToInches(linearSlideAvgPosition));
-            telemetry.addData("Hook Distance", liftTicksToHookDistInches(linearSlideAvgPosition));
+//            telemetry.addData("Hook Distance", liftTicksToHookDistInches(linearSlideAvgPosition));
             telemetry.addLine("-------------------------");
 
             telemetry.addLine("LIFT PIVOTS");
@@ -2354,20 +2386,56 @@ public class Robot2Teleop extends LinearOpMode {
 
 
     /**
+     * <strong>NOTE:</strong> please use getSamplePossession() after if you want color detection <br>
      * Used in automation. Determines possession based on distance.
      * @param currentSampleDistance current distance reading from the sample sensor
      * @return whether intake can see it has collected a sample
      **/
     private boolean isPossessingSample(double currentSampleDistance) {
-        // TODO: add color sensor function here
 
         // robot has successfully acquired a sample
         if (currentSampleDistance < SENSOR_VARIABLES.sampleDistance) {
             return true;
         } else {
-            // robot did not get sample
             return false;
         }
+    }
+
+
+    /**
+     * Used in automation. Determines the type of sample the robot is currently in possession of
+     * based on distance and color. <br> Color is not considered if no alliance is selected
+     * at the start of the program
+     * @return Alliance Type of sample the robot collected, or no sample if none collected <br>
+     * <strong>cheat sheet:</strong> <br>
+     * NEUTRAL - yellow sample <br>
+     * BLUE/RED - returned based on alliance selection <br>
+     * UNKNOWN - no sample found, or wrong color
+     */
+    private Alliance getSamplePossession() {
+        double currentSampleDistance = sampleSensor.getDistance(DistanceUnit.CM);
+
+        // robot has successfully acquired a sample
+        // this reading is redundant but I refuse to change it
+        if (currentSampleDistance < SENSOR_VARIABLES.sampleDistance) {
+            // get info on the sample
+            Alliance sampleColor = getCurrentSampleAlliance();
+
+            // color logic
+            if (robotAlliance == Alliance.NEUTRAL) {
+                // no alliance selected at the start, give sample regardless of color
+                return Alliance.NEUTRAL;
+            } else if (sampleColor == Alliance.NEUTRAL || sampleColor == Alliance.UNKNOWN) {
+                // give robot sample since it is probably neutral
+                return Alliance.NEUTRAL;
+            } else if (sampleColor == robotAlliance) {
+                // robot collected a color sample and it is correct
+                return sampleColor;
+            }
+        }
+
+        // no sample detected, or it is the wrong color
+        return Alliance.UNKNOWN;
     }
 
     /**
@@ -2762,11 +2830,11 @@ public class Robot2Teleop extends LinearOpMode {
         return inches * LIFT_TICKS_PER_INCH_EXTENDED;
     }
 
-    private double liftTicksToHookDistInches(double ticks) {
+    /*private double liftTicksToHookDistInches(double ticks) {
         return liftTicksToInches(ticks) + STABILIZER_CONSTANTS.initialHookDist;
     }
 
     private double hookDistInchesToLiftTicks(double inches) {
         return inchesToLiftTicks(inches - STABILIZER_CONSTANTS.initialHookDist);
-    }
+    }*/
 }
