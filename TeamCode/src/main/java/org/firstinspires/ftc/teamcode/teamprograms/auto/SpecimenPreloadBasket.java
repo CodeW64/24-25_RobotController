@@ -30,6 +30,7 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
+import com.acmerobotics.roadrunner.RaceAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
@@ -111,7 +112,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static double MIN_REAMINING_SCORE_SEC = 3.0;
 
     public static int CHAMBER_EXTENSION = 1300;
-    public static int EXTEND_TO_SAMPLE_EXTENSION = 1300;
+    public static int EXTEND_INTO_SUBMERSIBLE = 1000;
+    public static int SUBMERSIBLE_SEARCH_EXTENSION = 1750;
+    public static int EXTEND_TO_SAMPLE_EXTENSION = 1500;
     public static int EXTEND_TO_SAMPLE_LAST_EXTENSION = 1300;
     public static int FULLY_RETRACTED = 500;
     public static int HOOK_RETRACTION = 300;
@@ -127,14 +130,17 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static double DIST_INCREMENT = -0.5; // NOTE: change this when roadRunner is tuned
     public static double DIST_STRAFE = 2.5;
     public static double DIST_STRAFE_LATER = 2.5;
+    public static double ALLIANCE_SHARING_DIST = 2; // Inches from the tile teeth, for space
     public static double SPECIMEN_PLACE_OFFSET = 2.2;
-    public static boolean DO_TURN_DEPO = false; // Should the robot turn the pivot when depositing?
+    // public static double SUBMERSIBLE_SEARCH_DIST = 3;
+    public static double FINAL_BACK_AWAY = 8;
+    
     
     // TODO: These are not able to be edited by Dash. Make them constructed when needed?
     //       Another thought: Make a class "PoseInit" with x, y, and theta attributes,
     //       and construct the Pose2ds at runtime? Call a method on the PoseInits to convert
     //       to a Pose2d? Food for thought. 🍗
-    public static Pose2d RETRY_OFFSET = new Pose2d(0.5, 1, 0);
+    public static Pose2d RETRY_OFFSET = new Pose2d(1.0, 0.5, 0);
     public static Pose2d INTAKE_OFFSET = new Pose2d(-6.25, 0, -Math.PI / 2);
     public static Vector2d GRABBING_DISTANCE = new Vector2d(-EXTEND_TO_SAMPLE_EXTENSION / LIFT_TICKS_PER_INCH_EXTENDED, 0);
     public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, -0.25, 0);
@@ -188,6 +194,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static double EXTENSION_POWER = 1.0; // Previously 0.15
     public static double RETRACTION_POWER = -1.0; // Previous -0.4
 
+    public static boolean DO_TURN_DEPO = false; // Should the robot turn the pivot when depositing?
     public static boolean goToAscent = false;
 
     public static interface ThreadIdentifiers {
@@ -763,6 +770,30 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         linearSlideRight.setPower(0);
     }
 
+    private boolean driveLiftToIterative(int target, int tolerance, double power) {
+        if((Math.abs(getLinearSlideAvgPosition() - target) > tolerance) && opModeIsActive()) {
+            // driveMotorToTo(linearSlideLift, target, tolerance, power);
+            setFightingGravity(false);
+            linearSlideLeft.setTargetPosition(target);
+            linearSlideLeft.setTargetPositionTolerance(tolerance);
+            linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideLeft.setPower(power);
+
+            linearSlideRight.setTargetPosition(target);
+            linearSlideRight.setTargetPositionTolerance(tolerance);
+            linearSlideRight.setMode(DcMotorEx.RunMode.RUN_TO_POSITION);
+            linearSlideRight.setPower(power);
+            return true;
+        } else {
+            setFightingGravity(true);
+            linearSlideLeft.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+            linearSlideLeft.setPower(0);
+            linearSlideRight.setMode(DcMotorEx.RunMode.RUN_USING_ENCODER);
+            linearSlideRight.setPower(0);
+            return false;
+        }
+    }
+
     /**
      * Extends the slides to a length of approx 12 inches. 
      * 
@@ -861,6 +892,14 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         final int tolerance = BUCKETS_EXTENSION_TOLERANCE;
         final double speed = EXTENSION_POWER;
         driveLiftTo(target, tolerance, speed);
+    }
+
+    private void extendToSubmersibleAsync() {
+        lift.extendSlides(
+            (int) EXTEND_TO_SAMPLE_EXTENSION, 
+            GRAB_EXTENSION_TOLERANCE, 
+            EXTENSION_POWER
+        );
     }
 
     /**
@@ -964,6 +1003,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             )
             && opModeIsActive()
         ) {
+            final double retryStart = autoRuntime.seconds();
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
             grabSampleAsync(); // Grab the sample
@@ -977,7 +1017,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                     !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
-                    && autoRuntime.seconds() <= GRAB_RETRY_SEC
+                    && autoRuntime.seconds() - retryStart <= GRAB_RETRY_SEC
+                    && autoRuntime.seconds() - grabSequenceStart <= GRAB_SYNC_MAX_SEC
                     && getSecondsRemaining() >= GRAB_MIN_REMAINING_SEC
                     && !isPossessingSample(currentSampleDistance)
                 )
@@ -1087,6 +1128,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     /**
      * Moves the robot to the chambers and places the specimen. The linear 
      * slides are in the slightly retracted position, and the pivot is in deposit.
+     * The arm is NOT pivoting down after invoking this method.
      */
     private void moveAndPlaceSpecimen(TranslationalVelConstraint cont, ProfileAccelConstraint cont2) 
         throws InterruptedException 
@@ -1096,14 +1138,16 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
         // Extend, move, and wait for the switch before hooking
         final double SAFETY_DIST = 24; // Used to prevent contact with the 
-        final double ALLIANCE_SHARING_DIST = 2; // Inches from the tile teeth, for space
 
         final Vector2d dest = new Vector2d(
             -48 + ROBOT_CENTER.position.x + SPECIMEN_PLACE_OFFSET, 
             BLUE_CHAMBER.position.y + ROBOT_CENTER.position.y + ALLIANCE_SHARING_DIST
         );
         resetDestinationOffset();
+
+        globalDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
         lineTo(globalDrive, dest, cont, cont2);
+        globalDrive.PARAMS.positionTolerance = 1.0;
         
     
         // Wait for the pivot to be reasonably rotated before extending 
@@ -1124,7 +1168,98 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         hookChamberSync();
         resetDestinationOffset();
     }
-    
+
+    private class SearchForSampleAction implements Action {
+        private boolean hasFoundValidSample = false;
+        private Alliance coloredAlliance = Alliance.NEUTRAL;
+
+        public SearchForSampleAction(Alliance coloredAlliance) {
+            super();
+            this.coloredAlliance = coloredAlliance;
+        }
+
+        @Override
+        public boolean run(TelemetryPacket p) {
+            // Is there a valid sample?
+            final Alliance currentAlliance = getCurrentSampleAlliance();
+            final boolean isDesired = 
+                   currentAlliance == coloredAlliance 
+                || currentAlliance == Alliance.NEUTRAL;
+
+            if(isDesired) {
+                // A valid sample was found! Tell the program to stop moving and grab
+                hasFoundValidSample = true;
+                return false;
+            }
+
+            // No sample has been found; continue searching
+            return true;
+        }
+
+        public boolean hasFoundValidSample() {
+            return this.hasFoundValidSample;
+        }
+    }
+
+    private void searchForSubmersibleSample(boolean findBlue) throws InterruptedException {
+        // Getting the allowed alliance
+        final Alliance coloredAlliance = findBlue ? Alliance.BLUE : Alliance.RED;
+
+        // Get the arm down and into the submerisble
+        // switchArmAsync();
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
+        driveLiftTo(EXTEND_INTO_SUBMERSIBLE, BUCKETS_EXTENSION_TOLERANCE, EXTENSION_POWER);
+        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+        // extendToSubmersibleAsync();
+        // lift.waitForFinish();
+
+        // Running the action to search for the sample This moves the robot while 
+        // searching. Once either the movement ends or the sample is found, we 
+        // the action ends
+        final Pose2d curPos = getCurrentPosition();
+        // final Action moveInSubmersible = globalDrive.actionBuilder(curPos)
+        //     .setTangent(Math.toRadians(90)) // Make the line vertical
+        //     .lineToY(curPos.position.y + SUBMERSIBLE_SEARCH_DIST)
+        //     .build();
+
+        final Action extendArmInSubmersible = new Action() {
+            @Override
+            public boolean run(TelemetryPacket p) {
+                return driveLiftToIterative(SUBMERSIBLE_SEARCH_EXTENSION, GRAB_EXTENSION_TOLERANCE, EXTENSION_POWER);
+            }
+        };
+
+        final SearchForSampleAction searchForSample = new SearchForSampleAction(coloredAlliance);
+        
+        // Actions.runBlocking(new RaceAction(moveInSubmersible, searchForSample));
+        Actions.runBlocking(new RaceAction(extendArmInSubmersible, searchForSample));
+
+        // Grabbing the sample if one was found
+        if(searchForSample.hasFoundValidSample()) {
+            grabSampleAsync();
+            isStateInitialized = false;
+            linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
+
+            // throw new RuntimeException("stuffs");
+
+            // Waiting for the sample to be grasped or too much time elapses
+            while(
+                !(
+                    linearSlideState.equals(LinearSlideStates.INTAKE_FULL)
+                    || linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
+                    || linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
+                )
+                && opModeIsActive()
+            ) {
+
+                Thread.sleep(30); // Saving CPU for battery and other threads if running
+            }
+        }
+
+        // Retracting the arm to avoid hitting 
+        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
+        driveLiftTo(Math.max(HOOK_RETRACTION - 100, 0), RETRACTION_TOLERANCE, RETRACTION_POWER);
+    }
 
     /**
      * Logs out the name of the section to time. The timer returned can be 
@@ -1171,18 +1306,24 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         // DEV START starting initialization for timing
         telemetry.clearAll();
         telemetry.setAutoClear(false);
-        lift.start();
-        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
-        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
         // ElapsedTime timer;
         // DEV END
 
         // Starting the actual stuffs
+        lift.start();
+        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberClosePos);
+        
+        // Putting on the preloaded specimen
         moveAndPlaceSpecimen(
             new TranslationalVelConstraint(MAX_NET_VEL), 
             new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL)
         );
+
+        // Going into the submersible
         switchArmAsync();
+        lift.waitForFinish();
+        searchForSubmersibleSample(isBlue);
         resetDestinationOffset();
 
         // Driving to the spike marks
@@ -1191,10 +1332,10 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         for(int i = MAX_GRAB_INDEX; i >= MIN_GRAB_INDEX && opModeIsActive(); i--) {
             // Initial positioning data
             final AprilTagDetection spikeMark = getDetection(this.neutralTagId);
-            final double extraRotation = i == 0 ? Math.toRadians(90) : 0; // Rotate more cuz' last one's hard to get to. 
+            final double extraRotation = i == 0 ? Math.toRadians(20) : 0; // Rotate more cuz' last one's hard to get to. 
             final Pose2d intakeOffset = new Pose2d(-6.25, 0, extraRotation - Math.PI / 2); // Offset from bot center
             final Pose2d grabbingDistance = i == 0 
-                ? new Pose2d(-GRABBING_DISTANCE / LIFT_TICKS_PER_INCH_EXTENDED, 0, 0) 
+                ? new Pose2d(-EXTEND_TO_SAMPLE_EXTENSION / LIFT_TICKS_PER_INCH_EXTENDED, 0, 0) 
                 : new Pose2d(-20.0, 0, 0);
             
             // Finding the offset
@@ -1210,7 +1351,7 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             Pose2d finalOffset = new Pose2d(rotatedPosition, totalOffset.heading); 
 
             if(i == 0) {
-                finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
+                // finalOffset = addPoses(finalOffset, new Pose2d(-2, 5, 0));
                 extendToSampleExtension = EXTEND_TO_SAMPLE_LAST_EXTENSION;
             } else {
                 finalOffset = addPoses(finalOffset, new Pose2d(1, -0.25, 0));
@@ -1275,8 +1416,18 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             isFirstSpikeSample = false;
         }
 
+        // Moving back to prevent hitting the arm on the buckets
+        lineTo(
+            globalDrive, 
+            addPoses(getCurrentPosition(), new Pose2d(FINAL_BACK_AWAY, -FINAL_BACK_AWAY, 0)), // Go back a bit
+            new TranslationalVelConstraint(MAX_NET_VEL), 
+            null
+        );
+
+        // Retracting the arm and putting the intake in a good spot
         intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
         lift.extendSlides(0, 30, -1.0);
+        lift.waitForFinish();
 
         // if(goToAscent) {
             // setDestinationOffset(new Pose2d(0, 24, 0));
