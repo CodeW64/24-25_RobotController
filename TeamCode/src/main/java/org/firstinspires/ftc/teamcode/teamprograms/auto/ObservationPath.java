@@ -31,7 +31,6 @@ import org.firstinspires.ftc.vision.apriltag.AprilTagProcessor;
 import org.firstinspires.ftc.teamcode.MecanumDrive;
 import com.acmerobotics.roadrunner.Action;
 import com.acmerobotics.roadrunner.ParallelAction;
-import com.acmerobotics.roadrunner.RaceAction;
 import com.acmerobotics.roadrunner.Pose2d;
 import com.acmerobotics.roadrunner.Vector2d;
 import com.acmerobotics.roadrunner.ProfileAccelConstraint;
@@ -58,7 +57,7 @@ import org.firstinspires.ftc.robotcore.external.navigation.AngleUnit;
  * @author Connor Larson
  */
 @Config
-@Autonomous(name="Observation Path")
+@Autonomous(name="Observation Path (Spike Mark Pusher ~ 2 Push)")
 public class ObservationPath extends AutoCommonPaths {
     private boolean isBlue = true;
     private boolean shouldParkObservation = true; // False: Go to ascent zone there
@@ -103,6 +102,10 @@ public class ObservationPath extends AutoCommonPaths {
 
     private double sampleSensingDistance;
 
+    public static int GRAB_FIRST = 0;
+    public static int PUSH_ITER = 2;
+    public static int GRAB_ITER = 2;
+
     public static double DIST_INCREMENT = 10;
     public static double SPECIMEN_LATERAL_INCREMENT = 1.5;
     public static double DIST_FROM = 5 + ROBOT_CENTER.position.x;
@@ -111,9 +114,10 @@ public class ObservationPath extends AutoCommonPaths {
     public static double SPIKE_MARK_LENGTH = 3.5;
     public static double SPIKE_OFFSET = 20 - SPIKE_MARK_LENGTH / 2;
     public static double BLUE_SPIKE_X = BLUE_COLORED_TAG.position.x + SPIKE_OFFSET;
-    public static double END_X = -48;
+    public static double END_X = -51;
+    public static double SAFE_PLACE_DIST = 6;
 
-    final double ALLIANCE_SHARING_DIST_REPEATED = -10; // Inches from the tile teeth, for space
+    public static double ALLIANCE_SHARING_DIST_REPEATED = -2; // Inches from the tile teeth, for space
 
     public static double MAX_NET_VEL = 40;
     public static double MIN_NET_ACCEL = 50;
@@ -125,7 +129,7 @@ public class ObservationPath extends AutoCommonPaths {
     public static double GRAB_SYNC_MAX_SEC = 5.0;
     public static double GRAB_RETRY_SEC = 1.5;
     public static double MIN_REAMINING_SCORE_SEC = 3.0;
-    public static double GRAB_PAUSE = 10;
+    public static double GRAB_PAUSE = 0;
 
     public static int CHAMBER_EXTENSION = 1300;
     public static int EXTEND_TO_SAMPLE_EXTENSION = 1500;
@@ -139,7 +143,7 @@ public class ObservationPath extends AutoCommonPaths {
     public static double NET_ZONE_TOLERANCE = 0.7;
 
     public static double SQRT2 = Math.sqrt(2); // approx 1.4142
-    public static double SPECIMEN_PLACE_OFFSET = 1.8;
+    public static double SPECIMEN_PLACE_OFFSET = 0;
     
     // TODO: These are not able to be edited by Dash. Make them constructed when needed?
     //       Another thought: Make a class "PoseInit" with x, y, and theta attributes,
@@ -220,7 +224,7 @@ public class ObservationPath extends AutoCommonPaths {
      * Contains methods so that the arm can be managed from outside the teleop, 
      * asynchronously.
      */
-    private class LiftHandlerThread extends CloseableThread {
+    protected class LiftHandlerThread extends CloseableThread {
         private boolean isOpen = true;
         private Boolean isExtending = false;
         private Boolean isSwitching = false;
@@ -748,7 +752,7 @@ public class ObservationPath extends AutoCommonPaths {
         public abstract void close();
     }
 
-    private final LiftHandlerThread lift = new LiftHandlerThread(); 
+    protected final LiftHandlerThread lift = new LiftHandlerThread(); 
     private final ArrayList<ConditionalThread> quedThreads = new ArrayList<ConditionalThread>();
     private ElapsedTime autoRuntime = new ElapsedTime();
     final VelConstraint slowAtEnd = (robotPose, path, disp) -> {
@@ -966,14 +970,6 @@ public class ObservationPath extends AutoCommonPaths {
         driveLiftTo(target, tolerance, speed);
     }
 
-    private void extendToSubmersibleAsync() {
-        lift.extendSlides(
-            (int) EXTEND_TO_SAMPLE_EXTENSION, 
-            GRAB_EXTENSION_TOLERANCE, 
-            EXTENSION_POWER
-        );
-    }
-
     /**
      * Extends the arm to the buckets once the arm has sufficiently switched.
      * Both the waiting and the extending are done asynchronously. To wait for
@@ -984,13 +980,13 @@ public class ObservationPath extends AutoCommonPaths {
      * @param extendBound How far up the pivot must be before extending, in 
      *     pivot ticks 
      */
-    private void queExtendToBucketsAsync(double extendBound) {
+    private void queExtendToChamberAsync(double extendBound) {
         // Make the thread that waits for the switch to finish
-        final ConditionalThread queThread = new ConditionalThread("queExtendToBucketsAsync.queThread", ThreadIdentifiers.QUE);
+        final ConditionalThread queThread = new ConditionalThread("queExtendToChamberAsync.queThread", ThreadIdentifiers.QUE);
         queThread.finishInitialization(
             () -> getLinearPivotAvgPosition() >= extendBound, 
             (Boolean unusedParam) -> {
-                extendToBucketsAsync();
+                extendToChambersAsync();
                 quedThreads.remove(queThread);
             }
         );
@@ -1097,6 +1093,7 @@ public class ObservationPath extends AutoCommonPaths {
     {
         // lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)), cont, cont2 );
         lift.switchToChamber();
+        queExtendToChamberAsync(SPECIMEN_SAFE_FOR_EXTENSION);
 
         // Extend, move, and wait for the switch before hooking
         final double SAFETY_DIST = 24; // Used to prevent contact with the 
@@ -1121,9 +1118,8 @@ public class ObservationPath extends AutoCommonPaths {
         ) {
             Thread.sleep(30); // Give time to other threads to do their thang
         }
-
         
-        extendToChambersAsync();
+        // extendToChambersAsync();
         lift.waitForFinish();
 
         // Moving forward and hooking onto the chamber'
@@ -1144,6 +1140,7 @@ public class ObservationPath extends AutoCommonPaths {
     ) throws InterruptedException {
         // lineTo( globalDrive, addPoses(getCurrentPosition(), new Pose2d(8, 0, 0)), cont, cont2 );
         lift.switchToChamber();
+        queExtendToChamberAsync(SPECIMEN_SAFE_FOR_EXTENSION);
 
         // Extend, move, and wait for the switch before hooking
         final double SAFETY_DIST = 24; // Used to prevent contact with the 
@@ -1156,7 +1153,21 @@ public class ObservationPath extends AutoCommonPaths {
         resetDestinationOffset();
 
         globalDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
-        lineToLinearHeading(globalDrive, dest, cont, cont2);
+        setDestinationOffset(new Pose2d(-SAFE_PLACE_DIST, 0, 0));
+        final TrajectoryActionBuilder lineToBuilder = getLineToLinearHeadingTrajectory(
+            globalDrive, 
+            dest, 
+            cont, 
+            cont2
+        );
+        resetDestinationOffset();
+
+        Actions.runBlocking(
+            lineToBuilder
+                .setTangent(0)
+                .lineToXSplineHeading(dest.position.x, dest.heading.toDouble())
+                .build()
+        );
         globalDrive.PARAMS.positionTolerance = 1.0;
         
     
@@ -1170,7 +1181,7 @@ public class ObservationPath extends AutoCommonPaths {
         }
 
         
-        extendToChambersAsync();
+        // extendToChambersAsync();
         lift.waitForFinish();
 
         // Moving forward and hooking onto the chamber'
@@ -1179,7 +1190,7 @@ public class ObservationPath extends AutoCommonPaths {
         resetDestinationOffset();
     }
 
-    private void moveAndGrabSpecimen(TrajectoryActionBuilder actionBuild) throws InterruptedException {
+    private void moveAndGrabSpecimen() throws InterruptedException {
         final Pose2d curPos = getCurrentPosition();
 
         // Raising the arm
@@ -1195,7 +1206,7 @@ public class ObservationPath extends AutoCommonPaths {
             .splineToSplineHeading(
                 new Pose2d(
                     END_X, 
-                    -48
+                    -42
                     ,Math.toRadians(180)
                 ),
                 Math.toRadians(180)
@@ -1212,38 +1223,6 @@ public class ObservationPath extends AutoCommonPaths {
         // extendToGrabSpecimenSync();
         grabSpecimenAsync();
         sleep(SPECIMEN_GRAB_MS);
-    }
-
-    private class SearchForSampleAction implements Action {
-        private boolean hasFoundValidSample = false;
-        private Alliance coloredAlliance = Alliance.NEUTRAL;
-
-        public SearchForSampleAction(Alliance coloredAlliance) {
-            super();
-            this.coloredAlliance = coloredAlliance;
-        }
-
-        @Override
-        public boolean run(TelemetryPacket p) {
-            // Is there a valid sample?
-            final Alliance currentAlliance = getCurrentSampleAlliance();
-            final boolean isDesired = 
-                   currentAlliance == coloredAlliance 
-                || currentAlliance == Alliance.NEUTRAL;
-
-            if(isDesired) {
-                // A valid sample was found! Tell the program to stop moving and grab
-                hasFoundValidSample = true;
-                return false;
-            }
-
-            // No sample has been found; continue searching
-            return true;
-        }
-
-        public boolean hasFoundValidSample() {
-            return this.hasFoundValidSample;
-        }
     }
 
     /**
@@ -1274,7 +1253,7 @@ public class ObservationPath extends AutoCommonPaths {
 
     private String accumulated = "";
 
-    private void main(boolean arg) throws InterruptedException {
+    protected void main(boolean arg) throws InterruptedException {
         // Completely disabling the idea of hitting buttons
         toggleBlueSide = null;
         toggleObservationPark = null;
@@ -1299,12 +1278,25 @@ public class ObservationPath extends AutoCommonPaths {
         
         lift.switchToSpecimenGrab();
 
+
+        // Grabbing the specimen from the wall
+        for(int i = 0; i < GRAB_FIRST; i++) {
+            // Grab from the wall
+            moveAndGrabSpecimen();
+
+            // Go and place the specimen 🐎
+            moveAndPlaceSpecimenRepeated(
+                (i + 1) * SPECIMEN_LATERAL_INCREMENT,
+                new TranslationalVelConstraint(MAX_NET_VEL), 
+                new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL)
+            );
+        }
+    
         // Moving the samples
         TrajectoryActionBuilder moveSamples = globalDrive.actionBuilder(getCurrentPosition())
             .setTangent(Math.toRadians(-90));
 
-        final int ITER = 2;
-        for(int i = 0; i < ITER; i++) {
+        for(int i = 0; i < PUSH_ITER; i++) {
             final double spikeY = BLUE_COLORED_TAG.position.y + 24 - DIST_INCREMENT * i;
             double distAway = JUST_MISSED_IT_DIST;
             
@@ -1351,9 +1343,9 @@ public class ObservationPath extends AutoCommonPaths {
         ));
 
         // Grabbing the specimen from the wall
-        for(int i = 0; i < ITER; i++) {
+        for(int i = GRAB_FIRST; i < GRAB_ITER; i++) {
             // Grab from the wall
-            moveAndGrabSpecimen(moveSamples);
+            moveAndGrabSpecimen();
 
             // Go and place the specimen 🐎
             moveAndPlaceSpecimenRepeated(
@@ -1362,6 +1354,7 @@ public class ObservationPath extends AutoCommonPaths {
                 new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL)
             );
         }
+
     }
 
     @Override

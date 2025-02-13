@@ -168,7 +168,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double depositRetractSetPos = 1800;
         public double specimenGrabPos = 764; // adjust to right angle
         public double specimenPositionPos = 1270; // adjust to right angle
-        public double specimenPlacePos = 1190; // adjust to right angle
+        public double specimenPlacePos = 1100; // adjust to right angle
         public double stabilizeReady = 1300;
 
     }
@@ -441,7 +441,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                     if (!isStateInitialized) {
                         if (!disableDuck) duckSpinner.setPower(DUCK_VALUES.spinRest);
 
-                        intakePivot.setPosition(SERVO_VALUES.pivotRestPos);
+                        intakePivot.setPosition(SERVO_VALUES.pivotCarryPos);
                         intakeWheelR.setPower(INTAKE_POWER_ZERO);
                         intakeWheelL.setPower(INTAKE_POWER_ZERO);
 

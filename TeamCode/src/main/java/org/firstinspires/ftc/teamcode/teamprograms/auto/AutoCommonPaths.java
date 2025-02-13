@@ -733,7 +733,40 @@ abstract public class AutoCommonPaths extends AprilLocater {
         }
         Actions.runBlocking(moveToTarget); // Pray 🤞
     }
+    
+    /**
+     * Uses RR to move in a line to the given point. the heading changes 
+     * linearly while moving, resulting at the given target's heading. 
+     * 
+     * @param drive The RR mecanum drivetrain to use as a basis. 
+     * @param target The destination.
+     * @return The trajectory that would be run by the other lineTo methods
+     */
+    protected TrajectoryActionBuilder getLineToLinearHeadingTrajectory(
+        MecanumDrive drive, 
+        Pose2d target, 
+        TranslationalVelConstraint cont, 
+        ProfileAccelConstraint cont2
+    ) {
+        // Moving the robot forward based on the odometry
+        final Pose2d currentPos = getCurrentPosition();
+        final Pose2d offsetTarget = addPoses(target, destinationOffset);
+        final Vector2d deltaPosition = offsetTarget.position.minus(currentPos.position);
+        TrajectoryActionBuilder moveToTarget;
+        if(deltaPosition.x == 0) {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToYLinearHeading(offsetTarget.position.y, offsetTarget.heading, cont, cont2);
+        } else {
+            moveToTarget = drive.actionBuilder(currentPos)
+                .setTangent(Math.atan2(deltaPosition.y, deltaPosition.x))    
+                .lineToXLinearHeading(offsetTarget.position.x, offsetTarget.heading, cont, cont2);
+        }
+
+        return moveToTarget;
+    }
  
+
     /**
      * Uses RR to move in a line to the given point. The heading remainins the 
      * same after moving.

@@ -124,6 +124,7 @@ public final class MecanumDrive {
         public double positionTolerance = 1.0; // Inches
         public double headingTolerance = Math.toRadians(5); // Radians
         public double velTolerance = 5.0; // Distance in/sec
+        public double readjustmentTime = 1.0;
     }
 
     public static class OldParams {
@@ -411,7 +412,7 @@ public final class MecanumDrive {
                     && error.position.norm() < PARAMS.positionTolerance
                     && Math.abs(Math.toDegrees(error.heading.toDouble())) < PARAMS.headingTolerance
                     && robotVelRobot.linearVel.norm() < PARAMS.velTolerance)
-                    || t >= timeTrajectory.duration + 1) {
+                    || t >= timeTrajectory.duration + PARAMS.readjustmentTime) {
                 leftFront.setPower(0);
                 leftBack.setPower(0);
                 rightBack.setPower(0);
