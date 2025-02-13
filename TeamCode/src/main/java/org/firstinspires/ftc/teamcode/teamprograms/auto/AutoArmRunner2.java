@@ -149,6 +149,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double topBucketHeightAlternate = 3050; // 312RPM-4100
         public double depositEndRetract = 1800;
         public double intakeEndRetract = 800;
+        public double specimenRelease = 950;
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
 
@@ -1168,7 +1169,7 @@ public class AutoArmRunner2 extends LinearOpMode {
                     }
 
                     // automatically let go of specimen once slides have gone down far enough to hang
-                    if (linearSlideAvgPosition < 890) {
+                    if (linearSlideAvgPosition < SLIDE_CONSTANTS.specimenRelease) {
                         specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                         specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                         isGrabberOpen = false;

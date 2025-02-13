@@ -199,6 +199,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double extensionLimitHang = 2700.0; // 312RPM-3800
         public double cushionRatio = 400.0;
         public double topBucketHeightAlternate = 3000.0; // 312RPM-4100 // 435RPM was 2930.0
+        public double specimenRelease = 950;
 
     }
     public static SlideConstants SLIDE_CONSTANTS = new SlideConstants();
@@ -218,9 +219,9 @@ public class Robot2Teleop extends LinearOpMode {
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
         public double hangOGPos = 2125;
-        public double specimenGrabPos = 750; // adjust to right angle
+        public double specimenGrabPos = 730; // adjust to right angle
         public double specimenPositionPos = 1270; // adjust to right angle
-        public double specimenPlacePos = 1190; // adjust to right angle
+        public double specimenPlacePos = 1100; // adjust to right angle
         public double stabilizeReady = 1310;
     }
     public static PivotConstants PIVOT_CONSTANTS = new PivotConstants();
@@ -1398,6 +1399,7 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideRight.setPower(0);
                         linearSlideLeft.setPower(0);
                         isStateInitialized = false;
+                        pivotPIDSpeedMultiplier = 1.0;
                         linearSlideState = LinearSlideStates.PIVOT_TO_HANG_TIME_OG;
                     }
                     break;
@@ -1434,6 +1436,15 @@ public class Robot2Teleop extends LinearOpMode {
                         linearSlideState = LinearSlideStates.SPECIMEN_PLACE;
                     }
 
+                    // go to hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        pivotPIDSpeedMultiplier = PIVOT_CONSTANTS.retractSetSpeedMultiplier;
+                        linearSlideState = LinearSlideStates.PIVOT_TO_HANG_TIME_OG;
+                    }
 
                     // ABORT
 
@@ -1483,7 +1494,7 @@ public class Robot2Teleop extends LinearOpMode {
                     }
 
                     // automatically let go of specimen once slides have gone down far enough to hang
-                    if (linearSlideAvgPosition < 890) {
+                    if (linearSlideAvgPosition < SLIDE_CONSTANTS.specimenRelease) {
                         specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                         specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
                         isGrabberOpen = false;
@@ -1513,6 +1524,21 @@ public class Robot2Teleop extends LinearOpMode {
                         specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
 
                         linearSlideState = LinearSlideStates.SPECIMEN_RETRACT;
+                    }
+
+                    // go to hang
+                    if (gamepad2.dpad_up && !checkGTwoDUP) {
+                        checkGTwoDUP = true;
+                        linearSlideRight.setPower(0);
+                        linearSlideLeft.setPower(0);
+                        isStateInitialized = false;
+                        pivotPIDSpeedMultiplier = PIVOT_CONSTANTS.retractSetSpeedMultiplier;
+
+                        // open grabbers in case of a mis-input where the servos may be ripped off
+                        // risks dropping the specimen in the robot, but better than breaking the robot
+                        specimenGrabberR.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        specimenGrabberL.setPosition(SERVO_VALUES.specimenGrabberOpenPos);
+                        linearSlideState = LinearSlideStates.PIVOT_TO_HANG_TIME_OG;
                     }
 
                     // flip back to specimen position if mistaken
