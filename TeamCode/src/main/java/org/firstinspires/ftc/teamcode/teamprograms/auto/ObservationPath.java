@@ -131,7 +131,7 @@ public class ObservationPath extends AutoCommonPaths {
     public static double MIN_REAMINING_SCORE_SEC = 3.0;
     public static double GRAB_PAUSE = 0;
 
-    public static int CHAMBER_EXTENSION = 1300;
+    public static int CHAMBER_EXTENSION = 1400;
     public static int EXTEND_TO_SAMPLE_EXTENSION = 1500;
     public static int EXTEND_TO_SAMPLE_LAST_EXTENSION = 1300;
     public static int FULLY_RETRACTED = 500;

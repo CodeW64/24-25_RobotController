@@ -77,7 +77,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * the global field plane, y is the height, and heading is the CCW rotation 
      * from the x-axis.
      */
-    private final Pose2d ROBOT_INIT_POSE = new Pose2d(17, 16.5, Math.toRadians(90));
+    private final Pose2d ROBOT_INIT_POSE = new Pose2d(17, 16.5, Math.toRadians(0));
     
     /**
      * Describes the the center of the robot's relative coordinates. See 
@@ -92,9 +92,9 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
      * Global coordinates of where and how the robot starts for this opmode.
      */
     private final Pose2d START_LOCATION = new Pose2d(
-        -72 + ROBOT_CENTER.position.y, // -72 is the left grid x-coord 
-         48 - ROBOT_CENTER.position.x, //  0 is the top y-coord
-         0  + ROBOT_CENTER.heading.toDouble() // 0 is the deafult rotation
+        -72 + ROBOT_CENTER.position.x, // -72 is the left grid x-coord 
+         48 - ROBOT_CENTER.position.y, //  0 is the top y-coord
+        Math.toRadians(0) + ROBOT_CENTER.heading.toDouble() // 0 is the deafult rotation
     );
 
     private double sampleSensingDistance;
@@ -385,7 +385,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
             buttonPresser.finishInitialization(
                 () -> 
                     linearSlideState.equals(AutoArmRunner2.LinearSlideStates.SPECIMEN_POSITION) 
-                    && Math.abs(getLinearPivotAvgPosition() - PIVOT_CONSTANTS.specimenPositionPos) < 20, 
+                    && Math.abs(getLinearPivotAvgPosition() - PIVOT_CONSTANTS.specimenPositionPos) < getPivotTolerance(), 
                 (Boolean unusedParam) -> {
                     gamepad2.left_trigger = 0;
                     gamepad2.dpad_left = false;
@@ -1057,10 +1057,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         lift.waitForSwitch();
 
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+        MecanumDrive.PARAMS.headingTolerance = Math.toRadians(1);
         setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
         moveRobotToNetZone(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
+        MecanumDrive.PARAMS.headingTolerance = Math.toRadians(5);
 
         //#region
         // DEV START: Post switch wait
@@ -1115,10 +1117,12 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
         lift.waitForSwitch();
 
         MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
+        MecanumDrive.PARAMS.headingTolerance = Math.toRadians(1);
         setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
         moveRobotToNetZone(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(MIN_NET_ACCEL, MAX_NET_ACCEL));
         resetDestinationOffset();
         MecanumDrive.PARAMS.positionTolerance = 1.0;
+        MecanumDrive.PARAMS.headingTolerance = Math.toRadians(5);
 
         // Waiting for the arm to be sufficiently extended before depositing
         // Arm is told to lift when teh arm is told to switch up (before the safety move)
@@ -1188,6 +1192,7 @@ public class SamplePreloadBasket2 extends AutoCommonPaths {
 
         // Moving to the buckets, raising the arm, and scoring
         initialScoreSequence(arg);
+        resetDestinationOffset();
 
         // Driving to the spike marks
         boolean isFirstSpikeSample = true;

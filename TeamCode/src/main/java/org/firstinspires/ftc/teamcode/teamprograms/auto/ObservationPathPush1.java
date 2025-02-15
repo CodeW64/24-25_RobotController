@@ -7,11 +7,11 @@ import com.acmerobotics.roadrunner.Vector2d;
 @Config 
 @Autonomous(name="Observation Path (Extra Colored Grabber ~ 1 Push)")
 public class ObservationPathPush1 extends ObservationPath {
-    public static int PUSH_ITER = 1;
-
     @Override
     protected void main(boolean arg) throws InterruptedException {
+        PUSH_ITER = 1;
         super.main(arg);
+        PUSH_ITER = 2;
 
         lift.switchArmMode();
         lift.extendSlides(0, RETRACTION_TOLERANCE, RETRACTION_POWER);

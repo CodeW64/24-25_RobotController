@@ -184,7 +184,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double intakePos = 100;
         public double depositPos = 1650;
         public double depositRetractSetPos = 1800;
-        public double specimenGrabPos = 764; // adjust to right angle
+        public double specimenGrabPos = 730; // adjust to right angle
         public double specimenPositionPos = 1270; // adjust to right angle
         public double specimenPlacePos = 1100; // adjust to right angle
         public double stabilizeReady = 1300;

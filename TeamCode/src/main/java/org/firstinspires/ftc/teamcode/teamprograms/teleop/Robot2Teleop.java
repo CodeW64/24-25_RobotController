@@ -193,7 +193,7 @@ public class Robot2Teleop extends LinearOpMode {
     // SLIDE VARIABLES (editable by FTC dashboard)
     public static class SlideConstants {
         public double gravityCoefficient = 0.0005;
-        public double extensionLimitIntake = 1780.0; // 312RPM-2500
+        public double extensionLimitIntake = 1500.0; // 312RPM-2500
         public double extensionLimitSpecimen = 1245.0;
         public double extensionLimitWall = 70.0;
         public double extensionLimitHang = 2700.0; // 312RPM-3800
