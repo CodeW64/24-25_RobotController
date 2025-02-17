@@ -36,14 +36,14 @@ import java.util.ArrayList;
 import java.util.function.BooleanSupplier;
 import java.util.function.Consumer;
 
-@TeleOp(group = "AAA")
+@TeleOp(group = "A")
 @Config
 public class Robot2TestIntakeSimple extends LinearOpMode {
 
     Servo intakePivot;
 
     public static class ServoValues {
-        public double pivotCarryPos = 0.23;
+        public double pivotCarryPos = 0.215;
         public double pivotDepositPos = 0.172;
         public double pivotEjectSamplePos = 0.218;
         public double pivotIntakePos = 0.1825;

@@ -102,7 +102,7 @@ public class AutoArmRunner2 extends LinearOpMode {
         public double pivotCarryPos = 0.2175;
         public double pivotDepositPos = 0.172;
         public double pivotEjectSamplePos = 0.218;
-        public double pivotIntakePos = 0.1825;
+        public double pivotIntakePos = 0.178;
         public double pivotHoverPos = 0.195;
         public double pivotRestPos = 0.195;
         
@@ -113,7 +113,7 @@ public class AutoArmRunner2 extends LinearOpMode {
 
     // more servo variables
     final double INTAKE_POWER_MAX = 1.0;
-    final double INTAKE_POWER_HOLD = 0.06;
+    final double INTAKE_POWER_HOLD = 0.16;
     final double INTAKE_POWER_EMPTY = -1.0;
     final double INTAKE_POWER_ZERO = 0;
 

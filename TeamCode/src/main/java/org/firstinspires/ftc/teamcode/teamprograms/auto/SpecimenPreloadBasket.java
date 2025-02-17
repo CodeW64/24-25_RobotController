@@ -133,8 +133,8 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
 
     public static double SQRT2 = Math.sqrt(2); // approx 1.4142
     public static double DIST_BACK = 8.3;
-    public static double DIST_BACK_LATER = 9.0;
-    public static double DIST_INCREMENT = -0.5; // NOTE: change this when roadRunner is tuned
+    public static double DIST_BACK_LATER = 9.5;
+    public static double DIST_INCREMENT = -1.0; // NOTE: change this when roadRunner is tuned
     public static double DIST_STRAFE = 2.5;
     public static double DIST_STRAFE_LATER = 2.5;
     public static double ALLIANCE_SHARING_DIST = 0; // Inches from the tile teeth, for space
@@ -151,14 +151,14 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
     public static Pose2d SUB_RETRY_OFFSET = new Pose2d(-0.5, -0.5, 0);
     public static Pose2d INTAKE_OFFSET = new Pose2d(-6.25, 0, -Math.PI / 2);
     public static Vector2d GRABBING_DISTANCE = new Vector2d(-EXTEND_TO_SAMPLE_EXTENSION / LIFT_TICKS_PER_INCH_EXTENDED, 0);
-    public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, 0.25, 0);
+    public static Pose2d NORMAL_GRAB_OFFSET = new Pose2d(1, 0.85, 0);
     public static double LAST_SPIKE_ANGLE = Math.toRadians(90);
 
     public static int MAX_GRAB_INDEX = 2;
     public static int MIN_GRAB_INDEX = 1;
     
     public static double PIVOT_SAFE_FOR_EXTENSION = 60 * PIVOT_TICKS_PER_DEGREE; // Pivot pos when extension to buckets may occur
-    public static double SPECIMEN_SAFE_FOR_EXTENSION = 1000; // Pivot pos when extension to buckets may occur
+    public static double SPECIMEN_SAFE_FOR_EXTENSION = 1100; // Pivot pos when extension to buckets may occur
     public static boolean USE_PIVOT_TOLERANCE = true; // Whether to use the fancy math for hasFinishedPivot
     public static double ARM_TO_BASKET_TOLERANCE_INCHES = 0.7; // Max arm displacement allowed when depositing
 
@@ -1013,8 +1013,6 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
             final double retryStart = autoRuntime.seconds();
             telemetry.addLine("Switching to intake mode to grab...");
             telemetry.update();
-            
-
             isStateInitialized = false;
             linearSlideState = LinearSlideStates.INTAKE_ATTEMPT_SAMPLE;
             grabSampleAsync(); // Grab the sample
@@ -1027,7 +1025,6 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
                 (
                     !linearSlideState.equals(LinearSlideStates.INTAKE_FULL) 
                     && !linearSlideState.equals(LinearSlideStates.INTAKE_EMPTY)
-                    && !linearSlideState.equals(LinearSlideStates.INTAKE_ACTIVE)
                     && autoRuntime.seconds() - retryStart <= GRAB_RETRY_SEC
                     && autoRuntime.seconds() - grabSequenceStart <= GRAB_SYNC_MAX_SEC
                     && getSecondsRemaining() >= GRAB_MIN_REMAINING_SEC
@@ -1394,48 +1391,9 @@ public class SpecimenPreloadBasket extends AutoCommonPaths {
         );
 
         // Going into the submersible
-        switchArmAsync();
-        lift.waitForFinish();
-        searchForSubmersibleSample(isBlue);
-
-        // Depositing the sample if one was grabbed
-        if(isPossessingSample(currentSampleDistance)) {
-            // Getting the arm up and extended (at least partially) first, and the robot in a safe pos
-            globalDrive.updatePoseEstimate();
-            switchArmAsync(); // Get the arm up
-            lift.waitForSwitchStart();
-
-            queExtendToBucketsAsync(PIVOT_SAFE_FOR_EXTENSION);
-
-            distBack = 2 * DIST_BACK;
-            distStrafe = DIST_STRAFE;
-            backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
-            MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
-            setDestinationOffset(backAway); // Move back to avoid accidental hanging
-            moveRobotToNetSafety(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL));
-            resetDestinationOffset();
-            MecanumDrive.PARAMS.positionTolerance = 1.0;
-
-            // Moving to the basket and scoring when the arm is sufficiently up
-            lift.waitForSwitch();
-
-            distBack = DIST_BACK;
-            distStrafe = DIST_STRAFE;
-            backAway = new Pose2d((distBack + distStrafe) / SQRT2, (distStrafe - distBack) / SQRT2, 0); // don't go too close to the buckets
-            MecanumDrive.PARAMS.positionTolerance = NET_ZONE_TOLERANCE;
-            MecanumDrive.PARAMS.headingTolerance = Math.toRadians(1);
-            setDestinationOffset(backAway); // Move back 4 inches to avoid accidental hanging
-            moveRobotToNetZone(isBlue, new TranslationalVelConstraint(MAX_NET_VEL), new ProfileAccelConstraint(-MIN_NET_ACCEL, MAX_NET_ACCEL));
-            resetDestinationOffset();
-            MecanumDrive.PARAMS.positionTolerance = 1.0;
-            MecanumDrive.PARAMS.headingTolerance = Math.toRadians(5);
-
-            // Waiting for the arm to be sufficiently extended before depositing
-            // Arm is told to lift when teh arm is told to switch up (before the safety move)
-            lift.waitForFinish();
-            berriddenOfSample(true); // Aaaaand deposit, then come back!
-        }
-
+        switchArmAsync(); 
+        // lift.waitForFinish();
+        // searchForSubmersibleSample(isBlue);
         resetDestinationOffset();
 
         // Driving to the spike marks

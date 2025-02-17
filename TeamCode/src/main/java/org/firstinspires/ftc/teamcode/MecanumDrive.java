@@ -101,7 +101,7 @@ public final class MecanumDrive {
         // turn profile parameters (in radians)
 
         // 30 = 2.531 ~ Math.toRadians(145)
-        public double maxAngVel = 2.880; // shared with path
+        public double maxAngVel = 1.44; // shared with path
 
         // 30 = 2.531 ~ Math.toRadians(145)
         public double maxAngAccel = 4.000; // ~ 165 degrees // 2.880

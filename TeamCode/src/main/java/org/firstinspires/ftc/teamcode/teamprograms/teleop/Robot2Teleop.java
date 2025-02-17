@@ -104,7 +104,7 @@ public class Robot2Teleop extends LinearOpMode {
         public double pivotCarryPos = 0.2175;
         public double pivotDepositPos = 0.172;
         public double pivotEjectSamplePos = 0.218;
-        public double pivotIntakePos = 0.1825;
+        public double pivotIntakePos = 0.178;
         public double pivotRestPos = 0.195;
         
         public double specimenGrabberOpenPos = 0.55; // adjust
@@ -113,10 +113,10 @@ public class Robot2Teleop extends LinearOpMode {
     public static ServoValues SERVO_VALUES = new ServoValues();
 
     // more servo variables
-    final double INTAKE_POWER_MAX = 1.0;
-    final double INTAKE_POWER_HOLD = 0.06;
-    final double INTAKE_POWER_EMPTY = -0.3;
-    final double INTAKE_POWER_ZERO = 0;
+    public static double INTAKE_POWER_MAX = 1.0;
+    public static double INTAKE_POWER_HOLD = 0.16;
+    public static double INTAKE_POWER_EMPTY = -0.3;
+    public static double INTAKE_POWER_ZERO = 0;
 
     // DUCK VALUES (editable by FTC dashboard)
     public static class DuckValues {
@@ -288,7 +288,7 @@ public class Robot2Teleop extends LinearOpMode {
     boolean disableDuck = false;
     boolean runningToBucketAprilTag = false;
     boolean overridePID = false;
-    boolean camera = true; // disable if camera not in use or if it doesn't exist
+    boolean camera = false; // disable if camera not in use or if it doesn't exist
     boolean isRunningPivotToPosition = false;
     boolean specimanning = false;
 
@@ -308,7 +308,7 @@ public class Robot2Teleop extends LinearOpMode {
 
         // drivetrain
         int driveSpeedIndex = 1; // change this to the index of the speed you want to start at
-        double[] driveSpeedRange = {0.5, 0.75, 1};
+        double[] driveSpeedRange = {0.3, 0.5, 0.75, 1};
         double driveSpeedFactor = 1;
 
         // tank drive
